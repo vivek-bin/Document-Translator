@@ -35,7 +35,6 @@ def trainLSTMAttModel(xTrain,yTrain):
 	decoderOutput = layers.TimeDistributed()(decoderLSTM)
 	
 	
-	
 	#model.summary()
 	model.compile(	optimizer=RMSprop(lr=8e-4),
 					loss='categorical_crossentropy',
