@@ -37,7 +37,7 @@ def loadHansards():
 			fileEn.extend(readArchiveFile(fileDir+fileName+"e.gz"))
 			fileFr.extend(readArchiveFile(fileDir+fileName+"f.gz"))
 	
-	print("hansards english length = "+str(len(fileEn)))
+	print("hansards length = "+str(len(fileEn)))
 	return fileFr,fileEn
 	
 

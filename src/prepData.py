@@ -10,6 +10,18 @@ def readData():
 	
 	fr, en = limitSentenceSize(epFr+hFr, epEn+hEn)
 	
+	fr = [l.split() for l in fr]
+	en = [l.split() for l in en]
+	
+	uniqueFr = set()
+	uniqueEn = set()
+	#for words in fr:
+	#	uniqueFr.update(words)
+	#for words in en:
+	#	uniqueEn.update(words)
+	
+	print(len(uniqueFr))
+	#print(len(uniqueEn))
 	
 	
 
@@ -26,7 +38,7 @@ def limitSentenceSize(fileFr,fileEn):
 
 
 def cleanData():
-
+	return
 
 
 
@@ -34,7 +46,7 @@ def cleanData():
 
 
 def vectorizeData():
-
+	return
 
 
 
@@ -42,9 +54,10 @@ def vectorizeData():
 
 
 def loadCleanData():
+	return
 
-
-
+if __name__ == "__main__":
+	readData()
 
 
 
