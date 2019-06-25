@@ -8,11 +8,12 @@ def readFile(fileName):
 	file = []
 	with open(fileName, encoding="utf8") as f:
 		file = list(f)
+	file = [l.lower() for l in file]
 	return file
 
 def readArchiveFile(fileName):
 	with gzip.open(fileName,"rb") as f:
-		file = f.read().decode("ISO-8859-1")
+		file = f.read().decode("ISO-8859-1").lower()
 	
 	file = file.strip().split("\n")
 	return file

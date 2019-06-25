@@ -8,27 +8,35 @@ def readData():
 	epFr,epEn = FA.loadEuroParl()
 	hFr,hEn = FA.loadHansards()
 	
-	fr, en = limitSentenceSize(epFr+hFr, epEn+hEn)
+	epFr = cleanText(epFr)
+	epEn = cleanText(epEn)
+	hFr = cleanText(hFr)
+	hEn = cleanText(hEn)
 	
-	fr = [l.split() for l in fr]
-	en = [l.split() for l in en]
+	epFr,epEn = limitSentenceSize(epFr, epEn)
+	hFr,hEn = limitSentenceSize(hFr, hEn)
 	
-	uniqueFr = set()
-	uniqueEn = set()
-	#for words in fr:
-	#	uniqueFr.update(words)
-	#for words in en:
-	#	uniqueEn.update(words)
+	return epFr+hFr, epEn+hEn
 	
-	print(len(uniqueFr))
-	#print(len(uniqueEn))
-	
+
+def cleanText(lines):
+	linesOut = []
+	for line in lines:
+		line = line.replace("."," . ").replace(","," , ").replace("'"," ' ").replace("!"," ! ").replace("?"," ? ")
+		linesOut.append(line)
+		
+	return linesOut
 	
 
 def limitSentenceSize(fileFr,fileEn):
 	global MAX_WORDS
+	
 	fileEn2 = []
 	fileFr2 = []
+	if len(fileFr) != len(fileEn):
+		print("files not of same number of sentences!")
+		return fileFr2, fileEn2
+	
 	for i in range(len(fileFr)):
 		if len(fileFr[i].split()) < MAX_WORDS and len(fileEn[i].split()) < MAX_WORDS:
 			fileFr2.append(fileFr[i])
@@ -36,28 +44,44 @@ def limitSentenceSize(fileFr,fileEn):
 			
 	return fileFr2, fileEn2
 
+	
+def getCharecters(file):
+	uniqueChars = set()
+	
+	for line in file:
+		uniqueChars.update(list(line))
+	
+	#return sorted([str(ord(c)).zfill(6) for c in uniqueChars])
+	return uniqueChars
+	
 
-def cleanData():
-	return
+def getWordIndex(file):
+	uniqueWords = set()
+	
+	for line in file:
+		uniqueWords.update(line.split())
+	
+	return uniqueWords
+	
+	
 
-
-
-
-
-
-def vectorizeData():
-	return
-
-
-
-
-
-
-def loadCleanData():
-	return
-
+	
 if __name__ == "__main__":
-	readData()
+	fr, en = readData()
+	frIndex = getWordIndex(fr)
+	enIndex = getWordIndex(en)
+	
+	frChars = getCharecters(fr)
+	enChars = getCharecters(en)
+	frCharDict = {c:ord(c) for c in frChars}
+	enCharDict = {c:ord(c) for c in enChars}
+	
+	print("".join(sorted(frCharDict.keys())))
+	print("".join(sorted(enCharDict.keys())))
+	
+	print(len(frIndex))
+	print(len(enIndex))
+	
 
 
 

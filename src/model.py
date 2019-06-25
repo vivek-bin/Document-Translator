@@ -26,9 +26,11 @@ def getData():
 
 def trainLSTMAttModel(xTrain,yTrain):
 
-	encoderInput = layers.Input(input_dimentions=NUM_ENG_WORDS)
+	encoderInput = layers.Input(input_dimentions=NUM_WORDS)
 	encoderEmbedding = layers.Embedding()(encoderInput)
-	encoderBiLSTM = layers.Bidirectional(layers.LSTM())(embedding)
+	encoderBiLSTM = layers.Bidirectional(layers.LSTM())(encoderEmbedding)
+	
+	
 	
 	decoderInput = layers.Input()
 	decoderLSTM = layers.LSTM()(decoderInput)
