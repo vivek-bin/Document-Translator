@@ -31,28 +31,32 @@ def trainLSTMAttModel(xTrain,yTrain):
 	INPUT_WORDS_COUNT = 10000
 	OUTPUT_WORDS_COUNT = 10000
 	EMBEDDING_SIZE = 128
-	LSTM_UNITS = 128
+	ENCODER_LSTM_UNITS = 128
+	DECODER_LSTM_UNITS = 128
 	ATTENTION_SIZE = 128
 	NEXT_WORD_SIZE = 128
 
 	encoderInput = layers.Input(batch_shape=(None,INPUT_SENTENCE_LENGTH))
 	encoderEmbedding = layers.Embedding(input_dim=INPUT_WORDS_COUNT, output_dim=EMBEDDING_SIZE, input_length=INPUT_SENTENCE_LENGTH)(encoderInput)
-	encoderBiLSTM = layers.Bidirectional(layers.LSTM(LSTM_UNITS, return_sequence=True))(encoderEmbedding)
+	encoderBiLSTM = layers.Bidirectional(layers.LSTM(ENCODER_LSTM_UNITS, return_sequence=True))(encoderEmbedding)
 	
 	
 	decoderInput = layers.Input(batch_shape=(None,OUTPUT_SENTENCE_LENGTH))
 	decoderEmbedding = layers.Embedding(input_dim=OUTPUT_WORDS_COUNT, output_dim=EMBEDDING_SIZE, input_length=OUTPUT_SENTENCE_LENGTH)(decoderInput)
-	decoderLSTM = layers.LSTM(LSTM_UNITS)(decoderEmbedding)
+	decoderLSTM, decoderStates = layers.LSTM(DECODER_LSTM_UNITS, return_states=True)(decoderEmbedding)
 	
 	
-	attentionInput = layers.Concat([encoderBiLSTM,decoderLSTM])
+	decoderToAtt = layers.RepeatVector(INPUT_SENTENCE_LENGTH)(decoderLSTM)
+	attentionInput = layers.Concat([encoderBiLSTM,decoderToAtt])
+	
 	attentionFC = layers.Dense(ATTENTION_SIZE)(attentionInput)
-	attentionFC = layers.Dense(1)(attentionInput)
-	attentionFC = layers.Activation("softmax")(attentionFC)
-	attentionFC = layers.Flaten()(attentionFC)
-	attentionAlpha = layers.Repeat(LSTM_UNITS)(attentionFC)
+	attentionFC = layers.Dense(1)(attentionFC)
+	attentionAlpha = layers.Activation("softmax")(attentionFC)
 	
+	attentionAlpha = layers.Flaten()(attentionAlpha)
+	attentionAlpha = layers.RepeatVector(ENCODER_LSTM_UNITS)(attentionAlpha)
 	contextOut = layers.Multiply([encoderBiLSTM,attentionAlpha])
+	
 	contextOut = layers.Concat([contextOut,decoderLSTM])
 	wordOut = layers.Dense(NEXT_WORD_SIZE)(contextOut)
 	wordOut = layers.Activation("softmax")(wordOut)
