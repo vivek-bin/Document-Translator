@@ -3,6 +3,8 @@ from keras.models import Sequential
 from keras import layers
 from keras.optimizers import RMSprop
 
+
+from recurrent_advanced import AttLSTMCond
 import prepData as PD
 
 
@@ -40,45 +42,47 @@ def trainLSTMAttModel(xTrain,yTrain):
 	encoderEmbedding = layers.Embedding(input_dim=INPUT_WORDS_COUNT, output_dim=EMBEDDING_SIZE, input_length=INPUT_SENTENCE_LENGTH)(encoderInput)
 	encoderBiLSTM = layers.Bidirectional(layers.LSTM(ENCODER_LSTM_UNITS, return_sequence=True))(encoderEmbedding)
 	
-	
 	decoderInput = layers.Input(batch_shape=(None,OUTPUT_SENTENCE_LENGTH))
 	decoderEmbedding = layers.Embedding(input_dim=OUTPUT_WORDS_COUNT, output_dim=EMBEDDING_SIZE, input_length=OUTPUT_SENTENCE_LENGTH)(decoderInput)
-	decoderLSTM, decoderStates = layers.LSTM(DECODER_LSTM_UNITS, return_states=True)(decoderEmbedding)
 	
 	
-	decoderToAtt = layers.RepeatVector(INPUT_SENTENCE_LENGTH)(decoderLSTM)
-	attentionInput = layers.Concat([encoderBiLSTM,decoderToAtt])
+	attentionLayer = AttLSTMCond(ENCODER_LSTM_UNITS, return_extra_variables=True, return_states=True, return_sequences=True)
+	[proj_h, x_att, alphas, h_state] = attentionLayer([decoderEmbedding,encoderBiLSTM])
 	
-	attentionFC = layers.Dense(ATTENTION_SIZE)(attentionInput)
-	attentionFC = layers.Dense(1)(attentionFC)
-	attentionAlpha = layers.Activation("softmax")(attentionFC)
 	
-	attentionAlpha = layers.Flaten()(attentionAlpha)
-	attentionAlpha = layers.RepeatVector(ENCODER_LSTM_UNITS)(attentionAlpha)
-	contextOut = layers.Multiply([encoderBiLSTM,attentionAlpha])
+	############attention implementation
+	#decoderLSTM, decoderStates = layers.LSTM(DECODER_LSTM_UNITS, return_states=True)(decoderEmbedding)
+	#decoderToAtt = layers.RepeatVector(INPUT_SENTENCE_LENGTH)(decoderLSTM)
+	#attentionInput = layers.Concat([encoderBiLSTM,decoderToAtt])
+	#attentionFC = layers.Dense(ATTENTION_SIZE)(attentionInput)
+	#attentionFC = layers.Dense(1)(attentionFC)
+	#attentionAlpha = layers.Activation("softmax")(attentionFC)
+	#attentionAlpha = layers.Flaten()(attentionAlpha)
+	#attentionAlpha = layers.RepeatVector(ENCODER_LSTM_UNITS)(attentionAlpha)
+	#contextOut = layers.Multiply([encoderBiLSTM,attentionAlpha])
 	
 	contextOut = layers.Concat([contextOut,decoderLSTM])
 	wordOut = layers.Dense(NEXT_WORD_SIZE)(contextOut)
 	wordOut = layers.Activation("softmax")(wordOut)
 	
-	model = Model(inputs=[encoderInput,decoderInput],outputs=[wordOut])
+	trainingModel = Model(inputs=[encoderInput,decoderInput],outputs=[wordOut])
 	
 	
 	#model.summary()
-	model.compile(	optimizer=RMSprop(lr=8e-4),
+	trainingModel.compile(	optimizer=RMSprop(lr=8e-4),
 					loss='categorical_crossentropy',
 					metrics=['acc'])
 	
 	
-	history = model.fit(xTrain, yTrain,
+	history = trainingModel.fit(xTrain, yTrain,
 					epochs=40,
 					batch_size=128,
 					validation_split=0.2)
 	
-	model.summary()
-	saveModel(model, "label_model")
+	trainingModel.summary()
+	saveModel(trainingModel, "training_model")
 	
-	return model
+	return trainingModel
 	
 
 def saveModel(model,modelName):
