@@ -40,32 +40,42 @@ def trainLSTMAttModel(xTrain,yTrain):
 
 	encoderInput = layers.Input(batch_shape=(None,INPUT_SENTENCE_LENGTH))
 	encoderEmbedding = layers.Embedding(input_dim=INPUT_WORDS_COUNT, output_dim=EMBEDDING_SIZE, input_length=INPUT_SENTENCE_LENGTH)(encoderInput)
-	encoderBiLSTM = layers.Bidirectional(layers.LSTM(ENCODER_LSTM_UNITS, return_sequence=True))(encoderEmbedding)
+	encoderOut = layers.Bidirectional(layers.LSTM(ENCODER_LSTM_UNITS, return_sequence=True))(encoderEmbedding)
 	
 	decoderInput = layers.Input(batch_shape=(None,OUTPUT_SENTENCE_LENGTH))
 	decoderEmbedding = layers.Embedding(input_dim=OUTPUT_WORDS_COUNT, output_dim=EMBEDDING_SIZE, input_length=OUTPUT_SENTENCE_LENGTH)(decoderInput)
 	
+	initialDecodeState = layers.Lambda(lambda x: x[:,-1,:])(encoderOut)
+	initialDecodeState = layers.Flatten(axis=1)(initialDecodeState)
 	
 	attentionLayer = AttLSTMCond(ENCODER_LSTM_UNITS, return_extra_variables=True, return_states=True, return_sequences=True)
-	[proj_h, x_att, alphas, h_state] = attentionLayer([decoderEmbedding,encoderBiLSTM])
-	
+	[proj_h, x_att, alphas, h_state] = attentionLayer([decoderEmbedding,encoderOut,initialDecodeState])
 	
 	############attention implementation
 	#decoderLSTM, decoderStates = layers.LSTM(DECODER_LSTM_UNITS, return_states=True)(decoderEmbedding)
 	#decoderToAtt = layers.RepeatVector(INPUT_SENTENCE_LENGTH)(decoderLSTM)
-	#attentionInput = layers.Concat([encoderBiLSTM,decoderToAtt])
+	#attentionInput = layers.Concat([encoderOut,decoderToAtt])
 	#attentionFC = layers.Dense(ATTENTION_SIZE)(attentionInput)
 	#attentionFC = layers.Dense(1)(attentionFC)
 	#attentionAlpha = layers.Activation("softmax")(attentionFC)
 	#attentionAlpha = layers.Flaten()(attentionAlpha)
 	#attentionAlpha = layers.RepeatVector(ENCODER_LSTM_UNITS)(attentionAlpha)
-	#contextOut = layers.Multiply([encoderBiLSTM,attentionAlpha])
+	#contextOut = layers.Multiply([encoderOut,attentionAlpha])
+
 	
-	contextOut = layers.Concat([contextOut,decoderLSTM])
-	wordOut = layers.Dense(NEXT_WORD_SIZE)(contextOut)
-	wordOut = layers.Activation("softmax")(wordOut)
+	decoderState = layers.TimeDistributed(layers.Dense(EMBEDDING_SIZE))(proj_h)
+	contextVector = layers.TimeDistributed(layers.Dense(EMBEDDING_SIZE))(x_att)
+	prevPrediction = layers.TimeDistributed(layers.Dense(EMBEDDING_SIZE))(decoderEmbedding)
+		
+	
+	
+	wordOut = layers.Add(activation='relu')([contextVector,decoderState,prevPrediction])
+	wordOut = layers.TimeDistributed(layers.Dense(EMBEDDING_SIZE))(wordOut)
+	wordOut = layers.TimeDistributed(layers.Dense(OUTPUT_WORDS_COUNT, activation="softmax"))(wordOut)
 	
 	trainingModel = Model(inputs=[encoderInput,decoderInput],outputs=[wordOut])
+	
+	
 	
 	
 	#model.summary()
