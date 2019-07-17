@@ -66,7 +66,7 @@ def trainLSTMAttModel(xTrain,yTrain):
 	decoderState = layers.TimeDistributed(layers.Dense(EMBEDDING_SIZE))(proj_h)
 	contextVector = layers.TimeDistributed(layers.Dense(EMBEDDING_SIZE))(x_att)
 	prevPrediction = layers.TimeDistributed(layers.Dense(EMBEDDING_SIZE))(decoderEmbedding)
-		
+	
 	
 	
 	wordOut = layers.Add(activation='relu')([contextVector,decoderState,prevPrediction])
