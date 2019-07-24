@@ -7,6 +7,7 @@ PATH = dirname(dirname(dirname(abspath(getsourcefile(lambda:0))))) + "\\"
 PROJECT = dirname(dirname(abspath(getsourcefile(lambda:0)))) + "\\"
 
 DATA = PATH + "data\\"
+LOGS = PATH + "logs\\"
 
 EUROPARL = DATA + "EuroParl\\"
 HANSARDS = DATA + "hansard\\"
@@ -24,4 +25,14 @@ HANSARDS_SENATE_TRAIN = HANSARDS_SENATE + "training\\"
 HANSARDS_SENATE_TEST = HANSARDS_SENATE + "testing\\"
 
 
+MAX_WORDS = 60
+
+
+
+INPUT_SENTENCE_LENGTH = 64
+OUTPUT_SENTENCE_LENGTH = 1
+INPUT_WORDS_COUNT = 10000
+OUTPUT_WORDS_COUNT = 10000
+EMBEDDING_SIZE = 128
+NUM_LSTM_UNITS = 128
 

@@ -42,3 +42,10 @@ def loadHansards():
 	return fileFr,fileEn
 	
 
+
+
+def writeFile(fileName, fileData):
+	print(fileData[0:5])
+	file = open(CONST.LOGS+fileName,mode="w",encoding="utf-8")
+	file.writelines("\n".join(fileData))
+	file.close()

@@ -30,63 +30,53 @@ def getData():
 
 
 def translationLSTMAttModel():
-	INPUT_SENTENCE_LENGTH = 64
-	OUTPUT_SENTENCE_LENGTH = 1
-	INPUT_WORDS_COUNT = 10000
-	OUTPUT_WORDS_COUNT = 10000
-	EMBEDDING_SIZE = 128
-	NUM_LSTM_UNITS = 128
-
-	########################
+	################################
 	#training model creation start
-	encoderInput = layers.Input(batch_shape=(None,INPUT_SENTENCE_LENGTH))
-	encoderEmbedding = layers.Embedding(input_dim=INPUT_WORDS_COUNT, output_dim=EMBEDDING_SIZE, input_length=INPUT_SENTENCE_LENGTH)(encoderInput)
-	encoderOut = layers.Bidirectional(layers.LSTM(NUM_LSTM_UNITS, return_sequence=True))(encoderEmbedding)
+	################################
+	encoderInput = layers.Input(batch_shape=(None,CONST.INPUT_SENTENCE_LENGTH))
+	encoderEmbedding = layers.Embedding(input_dim=CONST.INPUT_WORDS_COUNT, output_dim=CONST.EMBEDDING_SIZE, input_length=CONST.INPUT_SENTENCE_LENGTH)(encoderInput)
+	encoderOut = layers.Bidirectional(layers.LSTM(CONST.NUM_LSTM_UNITS, return_sequence=True))(encoderEmbedding)
 	
-	decoderInput = layers.Input(batch_shape=(None,OUTPUT_SENTENCE_LENGTH))
-	decoderEmbedding = layers.Embedding(input_dim=OUTPUT_WORDS_COUNT, output_dim=EMBEDDING_SIZE, input_length=OUTPUT_SENTENCE_LENGTH)(decoderInput)
-		
+	decoderInput = layers.Input(batch_shape=(None,CONST.OUTPUT_SENTENCE_LENGTH))
+	decoderEmbedding = layers.Embedding(input_dim=CONST.OUTPUT_WORDS_COUNT, output_dim=CONST.EMBEDDING_SIZE, input_length=CONST.OUTPUT_SENTENCE_LENGTH)(decoderInput)
+	
 	initialDecodeState = layers.Lambda(lambda x: x[:,-1,:])(encoderOut)
 	initialDecodeState = layers.Flatten(axis=1)(initialDecodeState)
 	
-	attentionLayer_SHARED = AttLSTMCond(NUM_LSTM_UNITS, return_extra_variables=True, return_states=True, return_sequences=True)
+	attentionLayer_SHARED = AttLSTMCond(CONST.NUM_LSTM_UNITS, return_extra_variables=True, return_states=True, return_sequences=True)
 	[proj_h, x_att, alphas, h_state] = attentionLayer_SHARED([decoderEmbedding,encoderOut,initialDecodeState])
 	
-	############attention implementation
-	#decoderLSTM, decoderStates = layers.LSTM(DECODER_LSTM_UNITS, return_states=True)(decoderEmbedding)
-	#decoderToAtt = layers.RepeatVector(INPUT_SENTENCE_LENGTH)(decoderLSTM)
-	#attentionInput = layers.Concat([encoderOut,decoderToAtt])
-	#attentionFC = layers.Dense(NUM_LSTM_UNITS)(attentionInput)
-	#attentionFC = layers.Dense(1)(attentionFC)
-	#attentionAlpha = layers.Activation("softmax")(attentionFC)
-	#attentionAlpha = layers.Flaten()(attentionAlpha)
-	#attentionAlpha = layers.RepeatVector(NUM_LSTM_UNITS)(attentionAlpha)
-	#contextOut = layers.Multiply([encoderOut,attentionAlpha])
-
-	decoderState_SHARED = layers.TimeDistributed(layers.Dense(EMBEDDING_SIZE))
+	decoderState_SHARED = layers.TimeDistributed(layers.Dense(CONST.EMBEDDING_SIZE))
 	decoderState = decoderState_SHARED(proj_h)
-	contextVector_SHARED = layers.TimeDistributed(layers.Dense(EMBEDDING_SIZE))
+	contextVector_SHARED = layers.TimeDistributed(layers.Dense(CONST.EMBEDDING_SIZE))
 	contextVector = contextVector_SHARED(x_att)
-	prevPrediction_SHARED = layers.TimeDistributed(layers.Dense(EMBEDDING_SIZE))
+	prevPrediction_SHARED = layers.TimeDistributed(layers.Dense(CONST.EMBEDDING_SIZE))
 	prevPrediction = prevPrediction_SHARED(decoderEmbedding)
 	
 	wordOut = layers.Add(activation='relu')([contextVector,decoderState,prevPrediction])
-	wordOut_SHARED_1 = layers.TimeDistributed(layers.Dense(EMBEDDING_SIZE))
+	wordOut_SHARED_1 = layers.TimeDistributed(layers.Dense(CONST.EMBEDDING_SIZE))
 	wordOut = wordOut_SHARED_1(wordOut)
-	wordOut_SHARED_2 = layers.TimeDistributed(layers.Dense(OUTPUT_WORDS_COUNT, activation="softmax"))
+	wordOut_SHARED_2 = layers.TimeDistributed(layers.Dense(CONST.OUTPUT_WORDS_COUNT, activation="softmax"))
 	wordOut = wordOut_SHARED_2(wordOut)
 	
 	trainingModel = Model(inputs=[encoderInput,decoderInput],outputs=[wordOut])
+	trainingModel.compile(optimizer=RMSprop(lr=8e-4),loss='categorical_crossentropy',metrics=['acc'])
 	
 
 
 	################################
 	#sampling model creation start
+	################################
+
+	###########
+	#first step prediction model creation start
 	samplingModelInit = Model(inputs=[encoderInput,decoderInput],outputs=[wordOut,encoderOut,h_state,alphas])
+	samplingModelInit.compile(optimizer=RMSprop(lr=8e-4),loss='categorical_crossentropy',metrics=['acc'])
 
-	preprocessedEncoder = layers.Input(shape=(None,INPUT_SENTENCE_LENGTH*2))			#since Bi-LSTM
-	previousAttState = layers.Input(shape=(None,INPUT_SENTENCE_LENGTH))
-
+	###########
+	#next steps prediction model creation start
+	preprocessedEncoder = layers.Input(shape=(None,CONST.NUM_LSTM_UNITS*2))			#since Bi-LSTM
+	previousAttState = layers.Input(shape=(None,CONST.NUM_LSTM_UNITS))
 
 	[proj_h, x_att, alphas, h_state] = attentionLayer_SHARED([decoderEmbedding,preprocessedEncoder,previousAttState])
 
@@ -99,17 +89,30 @@ def translationLSTMAttModel():
 	wordOut = wordOut_SHARED_2(wordOut)
 	
 	samplingModelNext = Model(inputs=[preprocessedEncoder,previousAttState,decoderInput],outputs=[wordOut,preprocessedEncoder,h_state,alphas])
-
-	samplingModel = [samplingModelInit, samplingModelNext]
-
+	samplingModelNext.compile(optimizer=RMSprop(lr=8e-4),loss='categorical_crossentropy',metrics=['acc'])
 
 
-	trainingModel.compile(optimizer=RMSprop(lr=8e-4),loss='categorical_crossentropy',metrics=['acc'])
-	samplingModel[0].compile(optimizer=RMSprop(lr=8e-4),loss='categorical_crossentropy',metrics=['acc'])
-	samplingModel[1].compile(optimizer=RMSprop(lr=8e-4),loss='categorical_crossentropy',metrics=['acc'])
-
-	return trainingModel, samplingModel
+	return trainingModel, [samplingModelInit, samplingModelNext]
 	
+
+def customAttentionLayer():
+	###########attention implementation
+	decoderEmbedding = layers.Input(shape=(None,CONST.NUM_LSTM_UNITS*2))
+	encoderOut = layers.Input(shape=(None,CONST.NUM_LSTM_UNITS*2))
+
+
+	decoderLSTM, decoderStates = layers.LSTM(CONST.NUM_LSTM_UNITS, return_states=True)(decoderEmbedding)
+	decoderToAtt = layers.RepeatVector(CONST.INPUT_SENTENCE_LENGTH)(decoderLSTM)
+	attentionInput = layers.Concatenate([encoderOut,decoderToAtt])
+	attentionFC = layers.Dense(CONST.NUM_LSTM_UNITS)(attentionInput)
+	attentionFC = layers.Dense(1)(attentionFC)
+	attentionAlpha = layers.Activation("softmax")(attentionFC)
+	attentionAlpha = layers.Flatten()(attentionAlpha)
+	attentionAlpha = layers.RepeatVector(CONST.NUM_LSTM_UNITS)(attentionAlpha)
+	contextOut = layers.Multiply()([encoderOut,attentionAlpha])
+
+	return contextOut, decoderStates
+
 
 def saveModel(model,modelName):
 	# serialize model to JSON
