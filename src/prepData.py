@@ -2,7 +2,7 @@ import numpy
 import constants as CONST
 import fileaccess as FA
 import string
-
+import re
 
 def readEuroParlAndHansards():
 	epFr,epEn = readData(FA.loadEuroParl)
@@ -10,47 +10,72 @@ def readEuroParlAndHansards():
 
 	return epFr+hFr, epEn+hEn
 
+
 def readData(loadFunc):
 	fr, en = loadFunc()
-	fr, en = limitSentenceSize(fr, en)
-	
-	# frChars = getCharecters(fr)
-	# enChars = getCharecters(en)
-	# print("chars fr : " + str(len(frChars)) + "\n" + "".join(frChars))
-	# print("chars en : " + str(len(enChars)) + "\n" + "".join(enChars))
 
+	fr = cleanTextFr(fr)
+	en = cleanTextEn(en)
+
+	fr, en = limitSentenceSize(fr, en)
 	return fr, en
 	
 
-def cleanText(lines):
+def cleanTextEn(lines):
 	linesOut = []
 	for line in lines:
-		lineOut = cleanLine(line.lower())
+		line = line.lower().replace("’","'")
+		lineOut = cleanLineEn(line)
 		linesOut.append(lineOut)
 		
 	return linesOut
 	
 
-def cleanLine(line):
-	sentenceBreaks = set(".?!")
-	wordBreaks = sentenceBreaks | set(" ,:;\"")
+def cleanLineEn(line):
+	words = re.split(r"((?<=\D)[ \W]|[ \W](?=\D)| )",line)
+	words = [word for word in words if word]
+
+
+	quotePos = [i for i,word in enumerate(words) if word == "'"]
+	apostopheS = [i for i in quotePos if words[i+1] == "s"]
+	try:
+		apostopheBlankS = [i for i in quotePos if words[i+1] == " " and words[i+2] == "s"]
+	except IndexError:
+		print("1Index error while cleaning apostophes : " + line)
+	try:
+		SApostophe = [i for i in quotePos if words[i-1][-1] == "s" and not(words[i+1] == "s") and not(words[i+1] == " " and words[i+2] == "s")]
+	except IndexError:
+		print(words)
+		print(quotePos)
+		print("2Index error while cleaning apostophes : " + line)
+
+	for i in apostopheS:
+		words[i:i+1+1] = [words[i]+words[i+1]]
+	for i in apostopheBlankS:
+		words[i:i+2+1] = [words[i]+words[i+2]]
+	for i in SApostophe:
+		words[i:i+1+1] = [words[i]+words[i+2]]
+
+	words = [w for w in words if w.strip()]
+	return CONST.UNIT_SEP.join(words)
 	
-	allPunctuations = set(string.punctuation)
 
+def cleanTextFr(lines):
+	linesOut = []
+	for line in lines:
+		line = line.lower().replace("«",'"').replace("»",'"').replace("’","'")
+		lineOut = cleanLineFr(line)
+		linesOut.append(lineOut)
+		
+	return linesOut
+	
 
-
-	line = line.lower()
-	words = []
-	word = ""
-	for ch in line:
-		if ch in wordBreaks:
-			if word:
-				words.append(word)
-			words.append(ch)
-			word = ""
-		else:
-			word = word + ch
-	return words
+def cleanLineFr(line):
+	words = re.split(r"((?<=\D)[ \W]|[ \W](?=\D)| )",line)
+	words = [word for word in words if word]
+	
+	words = [w for w in words if w.strip()]
+	return CONST.UNIT_SEP.join(words)
 
 
 def limitSentenceSize(fileFr,fileEn):
@@ -62,9 +87,9 @@ def limitSentenceSize(fileFr,fileEn):
 	fileEn2 = []
 	numSamples = len(fileFr)
 	for i in range(numSamples):
-		if len(fileFr[i].split()) > CONST.MAX_WORDS:
+		if len(fileFr[i].split(CONST.UNIT_SEP)) > CONST.MAX_WORDS:
 			continue
-		elif len(fileEn[i].split()) > CONST.MAX_WORDS:
+		elif len(fileEn[i].split(CONST.UNIT_SEP)) > CONST.MAX_WORDS:
 			continue
 		else:
 			fileFr2.append(fileFr[i])
@@ -91,7 +116,7 @@ def getWordFrequencies(file):
 	wordDict = {}
 	
 	for line in file:
-		words = line.split()
+		words = line.split(CONST.UNIT_SEP)
 		for word in words:
 			if word in wordDict:
 				wordDict[word] += 1
@@ -118,6 +143,7 @@ def cleanRareChars(fr, en):
 
 	return fr, en
 	
+
 def charExamples(en, fr):
 	frChars = getCharecters(fr)
 	enChars = getCharecters(en)
@@ -146,10 +172,9 @@ def charExamples(en, fr):
 	FA.writeFile("char examples.txt",exampleList)
 
 
-	
+
 def main():
 	fr, en = readEuroParlAndHansards()
-
 	fr, en = cleanRareChars(fr, en)
 
 	frChars = getCharecters(fr)
