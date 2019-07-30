@@ -1,3 +1,5 @@
+# coding: utf-8
+
 import numpy
 import constants as CONST
 import fileaccess as FA
@@ -36,25 +38,25 @@ def cleanLineEn(line):
 	words = [word for word in words if word]
 
 
-	quotePos = [i for i,word in enumerate(words) if word == "'"]
-	apostopheS = [i for i in quotePos if words[i+1] == "s"]
-	try:
-		apostopheBlankS = [i for i in quotePos if words[i+1] == " " and words[i+2] == "s"]
-	except IndexError:
-		print("1Index error while cleaning apostophes : " + line)
-	try:
-		SApostophe = [i for i in quotePos if words[i-1][-1] == "s" and not(words[i+1] == "s") and not(words[i+1] == " " and words[i+2] == "s")]
-	except IndexError:
-		print(words)
-		print(quotePos)
-		print("2Index error while cleaning apostophes : " + line)
+	# quotePos = [i for i,word in enumerate(words) if word == "'"]
+	# apostopheS = [i for i in quotePos if words[i+1] == "s"]
+	# try:
+	# 	apostopheBlankS = [i for i in quotePos if words[i+1] == " " and words[i+2] == "s"]
+	# except IndexError:
+	# 	print("1Index error while cleaning apostophes : " + line)
+	# try:
+	# 	SApostophe = [i for i in quotePos if words[i-1][-1] == "s" and not(words[i+1] == "s") and not(words[i+1] == " " and words[i+2] == "s")]
+	# except IndexError:
+	# 	print(words)
+	# 	print(quotePos)
+	# 	print("2Index error while cleaning apostophes : " + line)
 
-	for i in apostopheS:
-		words[i:i+1+1] = [words[i]+words[i+1]]
-	for i in apostopheBlankS:
-		words[i:i+2+1] = [words[i]+words[i+2]]
-	for i in SApostophe:
-		words[i:i+1+1] = [words[i]+words[i+2]]
+	# for i in apostopheS:
+	# 	words[i:i+1+1] = [words[i]+words[i+1]]
+	# for i in apostopheBlankS:
+	# 	words[i:i+2+1] = [words[i]+words[i+2]]
+	# for i in SApostophe:
+	# 	words[i:i+1+1] = [words[i]+words[i+2]]
 
 	words = [w for w in words if w.strip()]
 	return CONST.UNIT_SEP.join(words)
