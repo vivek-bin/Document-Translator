@@ -23,6 +23,9 @@ def loadEuroParl():
 	fileFr = readFile(CONST.EUROPARL_FR)
 	fileEn = readFile(CONST.EUROPARL_EN)
 
+	if len(fileEn) != len(fileFr):
+		raise Exception("EuroParl corpus lengths mismatch")
+
 	print("europarl length = "+str(len(fileEn)))
 	return fileFr,fileEn
 	
@@ -38,6 +41,9 @@ def loadHansards():
 			fileEn.extend(readArchiveFile(fileDir+fileName+"e.gz"))
 			fileFr.extend(readArchiveFile(fileDir+fileName+"f.gz"))
 	
+	if len(fileEn) != len(fileFr):
+		raise Exception("Hansards corpus lengths mismatch")
+
 	print("hansards length = "+str(len(fileEn)))
 	return fileFr,fileEn
 	

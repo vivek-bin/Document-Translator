@@ -11,8 +11,6 @@ import constants as CONST
 
 TRAIN_SPLIT = 500000
 
-PATH = CONST.PATH
-MODEL_PATH = PATH + "models\\"
 
 
 def getData():
@@ -117,11 +115,11 @@ def customAttentionLayer():
 def saveModel(model,modelName):
 	# serialize model to JSON
 	model_json = model.to_json()
-	with open(MODEL_PATH + modelName + ".json", "w") as json_file:
+	with open(CONST.MODEL_PATH + modelName + ".json", "w") as json_file:
 		json_file.write(model_json)
 	
 	# serialize weights to HDF5
-	model.save_weights(MODEL_PATH + modelName + ".h5")
+	model.save_weights(CONST.MODEL_PATH + modelName + ".h5")
 	print("Saved model to disk")
 	
 

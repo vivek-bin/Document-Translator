@@ -6,6 +6,12 @@ from os.path import dirname
 PATH = dirname(dirname(dirname(abspath(getsourcefile(lambda:0))))) + "/"
 PROJECT = dirname(dirname(abspath(getsourcefile(lambda:0)))) + "/"
 
+
+MODEL_PATH = PROJECT + "models/"
+ENCODING_PATH = PROJECT + "encodings/"
+
+
+
 DATA = PATH + "data/"
 LOGS = PATH + "logs/"
 
@@ -28,6 +34,9 @@ HANSARDS_SENATE_TEST = HANSARDS_SENATE + "testing/"
 MAX_WORDS = 60
 UNIT_SEP = "\x1f"
 
+MIN_CHAR_COUNT = 30
+MIN_WORD_COUNT = 20
+CHAR_INPUT_SIZE = 8
 
 INPUT_SENTENCE_LENGTH = 64
 OUTPUT_SENTENCE_LENGTH = 1

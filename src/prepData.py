@@ -5,97 +5,61 @@ import constants as CONST
 import fileaccess as FA
 import string
 import re
+import json
+import numpy as np
 
 def readEuroParlAndHansards():
-	epFr,epEn = readData(FA.loadEuroParl)
-	hFr,hEn = readData(FA.loadHansards)
+	en = []
+	fr = []
 
-	return epFr+hFr, epEn+hEn
+	epFr, epEn = readData(FA.loadEuroParl)
+	fr = fr + epFr
+	en = en + epEn
+
+	hFr, hEn = readData(FA.loadHansards)
+	fr = fr + hFr
+	en = en + hEn
+
+
+
+	fr, en = cleanRareChars(fr, en)
+	return fr, en
 
 
 def readData(loadFunc):
 	fr, en = loadFunc()
 
-	fr = cleanTextFr(fr)
-	en = cleanTextEn(en)
+	fr = cleanText(fr)
+	en = cleanText(en)
 
 	fr, en = limitSentenceSize(fr, en)
 	return fr, en
 	
 
-def cleanTextEn(lines):
+def cleanText(lines):
 	linesOut = []
 	for line in lines:
 		line = line.lower().replace("’","'")
-		lineOut = cleanLineEn(line)
+		lineOut = cleanLine(line)
 		linesOut.append(lineOut)
 		
 	return linesOut
 	
 
-def cleanLineEn(line):
-	words = re.split(r"((?<=\D)[ \W]|[ \W](?=\D)| )",line)
-	words = [word for word in words if word]
+def cleanLine(line):
+	words = [w for s in re.findall(r'\b(?=\w*?\d)\w+(?:[\W_](?=\w*?\d)\w+)*|[^\W\d_]+|[\W_]', line) for w in re.findall(r'\s+|\S+',s)]
+	words = [word for word in words if word.strip()]
 
-
-	# quotePos = [i for i,word in enumerate(words) if word == "'"]
-	# apostopheS = [i for i in quotePos if words[i+1] == "s"]
-	# try:
-	# 	apostopheBlankS = [i for i in quotePos if words[i+1] == " " and words[i+2] == "s"]
-	# except IndexError:
-	# 	print("1Index error while cleaning apostophes : " + line)
-	# try:
-	# 	SApostophe = [i for i in quotePos if words[i-1][-1] == "s" and not(words[i+1] == "s") and not(words[i+1] == " " and words[i+2] == "s")]
-	# except IndexError:
-	# 	print(words)
-	# 	print(quotePos)
-	# 	print("2Index error while cleaning apostophes : " + line)
-
-	# for i in apostopheS:
-	# 	words[i:i+1+1] = [words[i]+words[i+1]]
-	# for i in apostopheBlankS:
-	# 	words[i:i+2+1] = [words[i]+words[i+2]]
-	# for i in SApostophe:
-	# 	words[i:i+1+1] = [words[i]+words[i+2]]
-
-	words = [w for w in words if w.strip()]
 	return CONST.UNIT_SEP.join(words)
 	
-
-def cleanTextFr(lines):
-	linesOut = []
-	for line in lines:
-		line = line.lower().replace("«",'"').replace("»",'"').replace("’","'")
-		lineOut = cleanLineFr(line)
-		linesOut.append(lineOut)
-		
-	return linesOut
-	
-
-def cleanLineFr(line):
-	words = re.split(r"((?<=\D)[ \W]|[ \W](?=\D)| )",line)
-	words = [word for word in words if word]
-	
-	words = [w for w in words if w.strip()]
-	return CONST.UNIT_SEP.join(words)
-
 
 def limitSentenceSize(fileFr,fileEn):
-	if len(fileFr) != len(fileEn):
-		print("files not of same number of sentences!")
-		return fileFr, fileEn
-	
-	fileFr2 = []
-	fileEn2 = []
-	numSamples = len(fileFr)
-	for i in range(numSamples):
-		if len(fileFr[i].split(CONST.UNIT_SEP)) > CONST.MAX_WORDS:
-			continue
-		elif len(fileEn[i].split(CONST.UNIT_SEP)) > CONST.MAX_WORDS:
-			continue
-		else:
-			fileFr2.append(fileFr[i])
-			fileEn2.append(fileEn[i])
+	maxWordsFr = [i for i,line in enumerate(fileFr) if line.count(CONST.UNIT_SEP) >= CONST.MAX_WORDS]
+	maxWordsEn = [i for i,line in enumerate(fileEn) if line.count(CONST.UNIT_SEP) >= CONST.MAX_WORDS]
+	maxWordLines = set(maxWordsFr) | set(maxWordsEn)
+
+	fileFr2 = [line for i, line in enumerate(fileFr) if i not in maxWordLines]
+	fileEn2 = [line for i, line in enumerate(fileEn) if i not in maxWordLines]
 	
 	return fileFr2, fileEn2
 
@@ -131,18 +95,17 @@ def getWordFrequencies(file):
 	
 
 def cleanRareChars(fr, en):
-	minCharCount = 15
-
 	frChars = getCharecters(fr)
 	enChars = getCharecters(en)
 
-	frCharsRare = [ch for ch, count in frChars.items() if count < minCharCount]
-	enCharsRare = [ch for ch, count in enChars.items() if count < minCharCount]
-	rareChars = set(frCharsRare + enCharsRare)
+	frCharsRare = [ch for ch, count in frChars.items() if count < CONST.MIN_CHAR_COUNT]
+	enCharsRare = [ch for ch, count in enChars.items() if count < CONST.MIN_CHAR_COUNT]
+	rareChars = set(frCharsRare) & set(enCharsRare)
 	removeLinesNumbers = set([i for i, line in enumerate(fr) if set(line) & rareChars] + [i for i, line in enumerate(en) if set(line) & rareChars])
 	fr = [l for i,l in enumerate(fr) if i not in removeLinesNumbers]
 	en = [l for i,l in enumerate(en) if i not in removeLinesNumbers]
 
+	print("size of data : " +str(len(fr)))
 	return fr, en
 	
 
@@ -174,11 +137,7 @@ def charExamples(en, fr):
 	FA.writeFile("char examples.txt",exampleList)
 
 
-
-def main():
-	fr, en = readEuroParlAndHansards()
-	fr, en = cleanRareChars(fr, en)
-
+def logDataDetails(fr, en):
 	frChars = getCharecters(fr)
 	enChars = getCharecters(en)
 	FA.writeFile("fr char counts.txt",[ch+" : "+str(count) for ch, count in frChars.items()])
@@ -193,10 +152,138 @@ def main():
 	FA.writeFile("frFreq.txt",[w+" : "+str(f) for w,f in frFreqList])
 	FA.writeFile("enFreq.txt",[w+" : "+str(f) for w,f in enFreqList])
 
-	
 	charExamples(en, fr)
+	
 
-	print("size of data : " +str(len(fr)))
+
+def writeEncodings():
+	fr, en = readEuroParlAndHansards()
+
+
+	encoding = wordEncoding(fr)
+	with open(CONST.ENCODING_PATH+"fr_word.json", "w") as f:
+		f.write(json.dumps(encoding))
+	encoding = charEncoding(fr)
+	with open(CONST.ENCODING_PATH+"fr_char.json", "w") as f:
+		f.write(json.dumps(encoding))
+
+
+	encoding = wordEncoding(en)
+	with open(CONST.ENCODING_PATH+"en_word.json", "w") as f:
+		f.write(json.dumps(encoding))
+	encoding = charEncoding(en)
+	with open(CONST.ENCODING_PATH+"en_char.json", "w") as f:
+		f.write(json.dumps(encoding))
+
+
+
+def wordEncoding(data):
+	words = getWordFrequencies(data)
+	encoding = [word for word,count in words.items() if count >= CONST.MIN_WORD_COUNT and not re.match(r".*?\d",word)]
+
+	encoding.insert(0,"MASK")
+	encoding.append("UNK")
+	
+	print("word encoding size : "+str(len(encoding)))
+	return encoding
+
+
+def charEncoding(data):
+	chars = getCharecters(data)
+	encoding = [ch for ch,count in chars.items() if count >= CONST.MIN_WORD_COUNT]
+
+	encoding.insert(0,"MASK")
+	encoding.append("UNK")
+
+	print("char encoding size : "+str(len(encoding)))
+	return encoding
+
+
+def createCharInput(input):
+	forwardCharInput = [CONST.UNIT_SEP.join([word[:CONST.CHAR_INPUT_SIZE] for word in line.split(CONST.UNIT_SEP)]) for line in input]
+	backwardCharInput = [CONST.UNIT_SEP.join([word[:-CONST.CHAR_INPUT_SIZE-1:-1] for word in line.split(CONST.UNIT_SEP)]) for line in input]
+
+	return forwardCharInput, backwardCharInput
+
+
+def loadDataFrToEng():
+	#load main data
+	fr, en = readEuroParlAndHansards()
+
+
+	fr = [line.split(CONST.UNIT_SEP) for line in fr]
+	en = [line.split(CONST.UNIT_SEP) for line in en]
+	
+	#create char level data for each word
+	frCharForward, frCharBackward = createCharInput(fr)
+
+
+	#encoded data
+	frEncoded = encodeWords(fr, "fr")
+	enEncoded = encodeWords(en, "en")
+	frCharForwardEncoded = encodeChars(frCharForward,"fr")
+	frCharBackwardEncoded = encodeChars(frCharBackward,"fr")
+
+	print("input text encoded words : "+str(frEncoded.shape))
+	print("input text encoded char(f) : "+str(frCharForwardEncoded.shape))
+	print("input text encoded char(b) : "+str(frCharBackwardEncoded.shape))
+	print("output text encoded words : "+str(enEncoded.shape))
+	
+	return (frEncoded, frCharForwardEncoded, frCharBackwardEncoded), enEncoded
+
+
+
+def encodeWords(data,encodingName):
+	encodedData = np.zeros((len(data), CONST.MAX_WORDS))			#initialize zero array
+
+
+	with open(CONST.ENCODING_PATH+encodingName+"_word.json", "r") as f:
+		encoding = json.load(f)
+	UNKEncoding = len(encoding) - 1
+	encoding = {word:i for i,word in enumerate(encoding)}
+
+
+	for i,line in enumerate(data):
+		for j,word in enumerate(line.split(CONST.UNIT_SEP)):
+			try:
+				encodedData[i][j] = encoding[word]
+			except KeyError:
+				encodedData[i][j] = UNKEncoding
+
+	return encodedData
+
+
+
+def encodeChars(data,encodingName):
+	encodedData = np.zeros((len(data), CONST.MAX_WORDS,CONST.CHAR_INPUT_SIZE))			#initialize zero array
+
+
+	with open(CONST.ENCODING_PATH+encodingName+"_char.json", "r") as f:
+		encoding = json.load(f)
+	UNKEncoding = len(encoding) - 1
+	encoding = {ch:i for i,ch in enumerate(encoding)}
+
+
+	for i,line in enumerate(data):
+		for j,word in enumerate(line.split(CONST.UNIT_SEP)):
+			for k,ch in enumerate(word):
+				try:
+					encodedData[i][j][k] = encoding[ch]
+				except KeyError:
+					encodedData[i][j][k] = UNKEncoding
+
+	return encodedData
+
+
+
+
+def main():
+	writeEncodings()
+	loadDataFrToEng()
+
+
+
+
 
 
 
