@@ -11,7 +11,6 @@ MODEL_PATH = PROJECT + "models/"
 ENCODING_PATH = PROJECT + "encodings/"
 
 
-
 DATA = PATH + "data/"
 LOGS = PATH + "logs/"
 
@@ -30,6 +29,11 @@ HANSARDS_HOUSE_TEST = HANSARDS_HOUSE + "testing/"
 HANSARDS_SENATE_TRAIN = HANSARDS_SENATE + "training/"
 HANSARDS_SENATE_TEST = HANSARDS_SENATE + "testing/"
 
+
+PROCESSED_DATA = DATA + "processed input/"
+
+
+DATA_COUNT = 10 * 1000 * 1000
 
 MAX_WORDS = 60
 UNIT_SEP = "\x1f"

@@ -7,34 +7,41 @@ import string
 import re
 import json
 import numpy as np
+from random import shuffle
 
-def readEuroParlAndHansards():
+def readData():
 	en = []
 	fr = []
 
-	epFr, epEn = readData(FA.loadEuroParl)
+	epFr, epEn = FA.loadEuroParl()
 	fr = fr + epFr
 	en = en + epEn
 
-	hFr, hEn = readData(FA.loadHansards)
+	hFr, hEn = FA.loadHansards()
 	fr = fr + hFr
 	en = en + hEn
 
 
+	frEn = list(zip(fr,en))
+	shuffle(frEn)
+	fr = [frLine for frLine, enLine in frEn]
+	en = [enLine for frLine, enLine in frEn]
+	
+	fr, en = cleanData(fr, en)
 
-	fr, en = cleanRareChars(fr, en)
 	return fr, en
 
 
-def readData(loadFunc):
-	fr, en = loadFunc()
-
+def cleanData(fr, en):
 	fr = cleanText(fr)
 	en = cleanText(en)
 
+	print("text clean finished")
+
 	fr, en = limitSentenceSize(fr, en)
+	fr, en = cleanRareChars(fr, en)
 	return fr, en
-	
+
 
 def cleanText(lines):
 	linesOut = []
@@ -137,7 +144,7 @@ def charExamples(en, fr):
 	FA.writeFile("char examples.txt",exampleList)
 
 
-def logDataDetails(fr, en):
+def writeDataDetailsToLog(fr, en):
 	frChars = getCharecters(fr)
 	enChars = getCharecters(en)
 	FA.writeFile("fr char counts.txt",[ch+" : "+str(count) for ch, count in frChars.items()])
@@ -156,13 +163,14 @@ def logDataDetails(fr, en):
 	
 
 
-def writeEncodings():
-	fr, en = readEuroParlAndHansards()
+def writeEncodingsData():
+	fr, en = readData()
 
 
 	encoding = wordEncoding(fr)
 	with open(CONST.ENCODING_PATH+"fr_word.json", "w") as f:
 		f.write(json.dumps(encoding))
+
 	encoding = charEncoding(fr)
 	with open(CONST.ENCODING_PATH+"fr_char.json", "w") as f:
 		f.write(json.dumps(encoding))
@@ -171,9 +179,17 @@ def writeEncodings():
 	encoding = wordEncoding(en)
 	with open(CONST.ENCODING_PATH+"en_word.json", "w") as f:
 		f.write(json.dumps(encoding))
+
 	encoding = charEncoding(en)
 	with open(CONST.ENCODING_PATH+"en_char.json", "w") as f:
 		f.write(json.dumps(encoding))
+
+	
+	with open(CONST.PROCESSED_DATA+"fr","w") as f:
+		f.write(json.dumps(fr))
+	with open(CONST.PROCESSED_DATA+"en","w") as f:
+		f.write(json.dumps(en))
+
 
 
 
@@ -208,12 +224,14 @@ def createCharInput(input):
 
 def loadDataFrToEng():
 	#load main data
-	fr, en = readEuroParlAndHansards()
+	with open(CONST.PROCESSED_DATA+"fr", "r") as f:
+		fr = json.load(f)
+		fr = fr[:CONST.DATA_COUNT]
+	with open(CONST.PROCESSED_DATA+"en", "r") as f:
+		en = json.load(f)
+		en = en[:CONST.DATA_COUNT]
+	print("data loaded")
 
-
-	fr = [line.split(CONST.UNIT_SEP) for line in fr]
-	en = [line.split(CONST.UNIT_SEP) for line in en]
-	
 	#create char level data for each word
 	frCharForward, frCharBackward = createCharInput(fr)
 
@@ -229,12 +247,13 @@ def loadDataFrToEng():
 	print("input text encoded char(b) : "+str(frCharBackwardEncoded.shape))
 	print("output text encoded words : "+str(enEncoded.shape))
 	
+	
 	return (frEncoded, frCharForwardEncoded, frCharBackwardEncoded), enEncoded
 
 
 
 def encodeWords(data,encodingName):
-	encodedData = np.zeros((len(data), CONST.MAX_WORDS))			#initialize zero array
+	encodedData = np.zeros((len(data), CONST.MAX_WORDS),dtype="uint16")			#initialize zero array
 
 
 	with open(CONST.ENCODING_PATH+encodingName+"_word.json", "r") as f:
@@ -255,7 +274,7 @@ def encodeWords(data,encodingName):
 
 
 def encodeChars(data,encodingName):
-	encodedData = np.zeros((len(data), CONST.MAX_WORDS,CONST.CHAR_INPUT_SIZE))			#initialize zero array
+	encodedData = np.zeros((len(data), CONST.MAX_WORDS,CONST.CHAR_INPUT_SIZE),dtype="uint8")			#initialize zero array
 
 
 	with open(CONST.ENCODING_PATH+encodingName+"_char.json", "r") as f:
@@ -278,7 +297,7 @@ def encodeChars(data,encodingName):
 
 
 def main():
-	writeEncodings()
+	#writeEncodingsData()
 	loadDataFrToEng()
 
 
