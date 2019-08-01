@@ -9,6 +9,7 @@ import json
 import numpy as np
 from random import shuffle
 
+
 def readData():
 	en = []
 	fr = []
@@ -184,21 +185,18 @@ def writeEncodingsData():
 	with open(CONST.ENCODING_PATH+"en_char.json", "w") as f:
 		f.write(json.dumps(encoding))
 
-	
-	with open(CONST.PROCESSED_DATA+"fr","w") as f:
-		f.write(json.dumps(fr))
-	with open(CONST.PROCESSED_DATA+"en","w") as f:
-		f.write(json.dumps(en))
-
-
+	saveEncodedData(fr, "fr")
+	saveEncodedData(en, "en")
 
 
 def wordEncoding(data):
 	words = getWordFrequencies(data)
 	encoding = [word for word,count in words.items() if count >= CONST.MIN_WORD_COUNT and not re.match(r".*?\d",word)]
+	encoding.sort()
 
-	encoding.insert(0,"MASK")
-	encoding.append("UNK")
+	encoding.insert(0,CONST.MASK_TOKEN)
+	encoding.append(CONST.UNKNOWN_TOKEN)			# unknown 
+	encoding.append(CONST.END_OF_SEQUENCE_TOKEN)	# end of sequence
 	
 	print("word encoding size : "+str(len(encoding)))
 	return encoding
@@ -207,58 +205,42 @@ def wordEncoding(data):
 def charEncoding(data):
 	chars = getCharecters(data)
 	encoding = [ch for ch,count in chars.items() if count >= CONST.MIN_WORD_COUNT]
+	encoding.sort()
 
-	encoding.insert(0,"MASK")
-	encoding.append("UNK")
+	encoding.insert(0,CONST.MASK_TOKEN)
+	encoding.append(CONST.UNKNOWN_TOKEN)			# unknown 
+	encoding.append(CONST.END_OF_SEQUENCE_TOKEN)	# end of sequence
 
 	print("char encoding size : "+str(len(encoding)))
 	return encoding
 
 
-def createCharInput(input):
-	forwardCharInput = [CONST.UNIT_SEP.join([word[:CONST.CHAR_INPUT_SIZE] for word in line.split(CONST.UNIT_SEP)]) for line in input]
-	backwardCharInput = [CONST.UNIT_SEP.join([word[:-CONST.CHAR_INPUT_SIZE-1:-1] for word in line.split(CONST.UNIT_SEP)]) for line in input]
-
-	return forwardCharInput, backwardCharInput
-
-
-def loadDataFrToEng():
-	#load main data
-	with open(CONST.PROCESSED_DATA+"fr", "r") as f:
-		fr = json.load(f)
-		fr = fr[:CONST.DATA_COUNT]
-	with open(CONST.PROCESSED_DATA+"en", "r") as f:
-		en = json.load(f)
-		en = en[:CONST.DATA_COUNT]
-	print("data loaded")
-
+def saveEncodedData(data, dataName):
 	#create char level data for each word
-	frCharForward, frCharBackward = createCharInput(fr)
-
+	charForward = [CONST.UNIT_SEP.join([word[:CONST.CHAR_INPUT_SIZE] for word in line.split(CONST.UNIT_SEP)]) for line in data]
+	charBackward = [CONST.UNIT_SEP.join([word[:-CONST.CHAR_INPUT_SIZE-1:-1] for word in line.split(CONST.UNIT_SEP)]) for line in data]
 
 	#encoded data
-	frEncoded = encodeWords(fr, "fr")
-	enEncoded = encodeWords(en, "en")
-	frCharForwardEncoded = encodeChars(frCharForward,"fr")
-	frCharBackwardEncoded = encodeChars(frCharBackward,"fr")
+	encoded = encodeWords(data, dataName)
+	charForwardEncoded = encodeChars(charForward, dataName)
+	charBackwardEncoded = encodeChars(charBackward, dataName)
 
-	print("input text encoded words : "+str(frEncoded.shape))
-	print("input text encoded char(f) : "+str(frCharForwardEncoded.shape))
-	print("input text encoded char(b) : "+str(frCharBackwardEncoded.shape))
-	print("output text encoded words : "+str(enEncoded.shape))
+	print("input text encoded words   : "+str(encoded.shape))
+	print("input text encoded char(f) : "+str(charForwardEncoded.shape))
+	print("input text encoded char(b) : "+str(charBackwardEncoded.shape))
 	
-	
-	return (frEncoded, frCharForwardEncoded, frCharBackwardEncoded), enEncoded
+	np.savez_compressed(CONST.PROCESSED_DATA + dataName + "EncodedData", encoded=encoded, charForwardEncoded=charForwardEncoded, charBackwardEncoded=charBackwardEncoded)
+
+	return encoded, charForwardEncoded, charBackwardEncoded
 
 
 
 def encodeWords(data,encodingName):
-	encodedData = np.zeros((len(data), CONST.MAX_WORDS),dtype="uint16")			#initialize zero array
+	encodedData = np.zeros((len(data), CONST.MAX_WORDS+1),dtype="uint16")			#initialize zero array
 
 
 	with open(CONST.ENCODING_PATH+encodingName+"_word.json", "r") as f:
 		encoding = json.load(f)
-	UNKEncoding = len(encoding) - 1
 	encoding = {word:i for i,word in enumerate(encoding)}
 
 
@@ -267,19 +249,21 @@ def encodeWords(data,encodingName):
 			try:
 				encodedData[i][j] = encoding[word]
 			except KeyError:
-				encodedData[i][j] = UNKEncoding
+				encodedData[i][j] = encoding[CONST.UNKNOWN_TOKEN]
+		j += 1
+		encodedData[i][j] = encoding[CONST.END_OF_SEQUENCE_TOKEN]
+
 
 	return encodedData
 
 
 
 def encodeChars(data,encodingName):
-	encodedData = np.zeros((len(data), CONST.MAX_WORDS,CONST.CHAR_INPUT_SIZE),dtype="uint8")			#initialize zero array
+	encodedData = np.zeros((len(data), CONST.MAX_WORDS+1,CONST.CHAR_INPUT_SIZE),dtype="uint8")			#initialize zero array
 
 
 	with open(CONST.ENCODING_PATH+encodingName+"_char.json", "r") as f:
 		encoding = json.load(f)
-	UNKEncoding = len(encoding) - 1
 	encoding = {ch:i for i,ch in enumerate(encoding)}
 
 
@@ -289,20 +273,50 @@ def encodeChars(data,encodingName):
 				try:
 					encodedData[i][j][k] = encoding[ch]
 				except KeyError:
-					encodedData[i][j][k] = UNKEncoding
+					encodedData[i][j][k] = encoding[CONST.UNKNOWN_TOKEN]
 
 	return encodedData
 
 
+def loadEncodedData():
+	# retrieve french
+	data = np.load(CONST.PROCESSED_DATA + "frEncodedData.npz")
+	frWordData = data["encoded"]
+	frCharForwardData = data["charForwardEncoded"]
+	frCharBackwardData = data["charBackwardEncoded"]
+	data = None
+
+	frWordData = frWordData[:CONST.DATA_COUNT].copy()
+	frCharForwardData = frCharForwardData[:CONST.DATA_COUNT].copy()
+	frCharBackwardData = frCharBackwardData[:CONST.DATA_COUNT].copy()
+
+	shape = frCharForwardData.shape
+	frCharForwardData = np.reshape(frCharForwardData, (shape[0], shape[1] * shape[2]))
+	frCharBackwardData = np.reshape(frCharBackwardData, (shape[0], shape[1] * shape[2]))
+
+
+	# retrieve english
+	data = np.load(CONST.PROCESSED_DATA + "enEncodedData.npz")
+	enWordData = data["encoded"]
+	enCharForwardData = data["charForwardEncoded"]
+	enCharBackwardData = data["charBackwardEncoded"]
+	data = None
+
+	enWordData = enWordData[:CONST.DATA_COUNT].copy()
+	enCharForwardData = enCharForwardData[:CONST.DATA_COUNT].copy()
+	enCharBackwardData = enCharBackwardData[:CONST.DATA_COUNT].copy()
+
+	shape = enCharForwardData.shape
+	enCharForwardData = np.reshape(enCharForwardData, (shape[0], shape[1] * shape[2]))
+	enCharBackwardData = np.reshape(enCharBackwardData, (shape[0], shape[1] * shape[2]))
+
+
+	return (frWordData, frCharForwardData, frCharBackwardData), (enWordData, enCharForwardData, enCharBackwardData)
+	
 
 
 def main():
-	#writeEncodingsData()
-	loadDataFrToEng()
-
-
-
-
+	writeEncodingsData()
 
 
 
