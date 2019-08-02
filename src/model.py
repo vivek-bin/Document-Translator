@@ -26,21 +26,43 @@ def translationLSTMAttModel():
 		INPUT_VOCABULARY_COUNT = len(json.load(f))
 	with open(CONST.ENCODING_PATH+"en_word.json", "r") as f:
 		OUTPUT_VOCABULARY_COUNT = len(json.load(f))
+	with open(CONST.ENCODING_PATH+"fr_char.json", "r") as f:
+		INPUT_CHAR_VOCABULARY_COUNT = len(json.load(f))
+	with open(CONST.ENCODING_PATH+"en_char.json", "r") as f:
+		OUTPUT_CHAR_VOCABULARY_COUNT = len(json.load(f))
 
 
 	################################
 	#training model creation start
 	################################
+	######ENCODER
+	#word embedding
 	encoderWordInput = layers.Input(batch_shape=(None,CONST.INPUT_SEQUENCE_LENGTH))
 	encoderWordEmbedding = layers.Embedding(input_dim=INPUT_VOCABULARY_COUNT, output_dim=CONST.WORD_EMBEDDING_SIZE, input_length=CONST.INPUT_SEQUENCE_LENGTH)(encoderWordInput)
-	encoderOut = layers.Bidirectional(layers.LSTM(CONST.NUM_LSTM_UNITS, return_sequence=True))(encoderWordEmbedding)
+	#char embedding
+	encoderCharInput = layers.Input(batch_shape=(None,CONST.INPUT_SEQUENCE_LENGTH * CONST.CHAR_INPUT_SIZE * 2))		# forward and backwards
+	encoderCharEmbedding = layers.Embedding(input_dim=INPUT_CHAR_VOCABULARY_COUNT, output_dim=CONST.CHAR_EMBEDDING_SIZE, input_length=CONST.INPUT_SEQUENCE_LENGTH * CONST.CHAR_INPUT_SIZE * 2)(encoderCharInput)
+	encoderCharEmbedding = layers.Reshape(target_shape=(CONST.INPUT_SEQUENCE_LENGTH, CONST.CHAR_INPUT_SIZE * 2 * CONST.CHAR_EMBEDDING_SIZE))(encoderCharEmbedding)
+	#final input embedding
+	encoderEmbedding = layers.Concatenate()(encoderWordEmbedding, encoderCharEmbedding)
 	
-	decoderInput = layers.Input(batch_shape=(None,CONST.OUTPUT_SEQUENCE_LENGTH))
-	decoderEmbedding = layers.Embedding(input_dim=OUTPUT_VOCABULARY_COUNT, output_dim=CONST.WORD_EMBEDDING_SIZE, input_length=CONST.OUTPUT_SEQUENCE_LENGTH)(decoderInput)
+	encoderOut = layers.Bidirectional(layers.LSTM(CONST.NUM_LSTM_UNITS, return_sequence=True))(encoderEmbedding)
 	
+	######DECODER
+	#word embedding
+	decoderWordInput = layers.Input(batch_shape=(None,CONST.OUTPUT_SEQUENCE_LENGTH))
+	decoderWordEmbedding = layers.Embedding(input_dim=OUTPUT_VOCABULARY_COUNT, output_dim=CONST.WORD_EMBEDDING_SIZE, input_length=CONST.OUTPUT_SEQUENCE_LENGTH)(decoderWordInput)
+	#char embedding
+	decoderCharInput = layers.Input(batch_shape=(None,CONST.OUTPUT_SEQUENCE_LENGTH * CONST.CHAR_INPUT_SIZE * 2))		# forward and backwards
+	decoderCharEmbedding = layers.Embedding(input_dim=OUTPUT_CHAR_VOCABULARY_COUNT, output_dim=CONST.CHAR_EMBEDDING_SIZE, input_length=CONST.OUTPUT_SEQUENCE_LENGTH * CONST.CHAR_INPUT_SIZE * 2)(decoderCharInput)
+	decoderCharEmbedding = layers.Reshape(target_shape=(CONST.OUTPUT_SEQUENCE_LENGTH, CONST.CHAR_INPUT_SIZE * 2 * CONST.CHAR_EMBEDDING_SIZE))(decoderCharEmbedding)
+	#final input embedding
+	decoderEmbedding = layers.Concatenate()(decoderWordEmbedding, decoderCharEmbedding)
+
 	initialDecodeState = layers.Lambda(lambda x: x[:,-1,:])(encoderOut)
 	initialDecodeState = layers.Flatten(axis=1)(initialDecodeState)
 	
+	######ATTENTION
 	attentionLayer_SHARED = AttLSTMCond(CONST.NUM_LSTM_UNITS, return_extra_variables=True, return_states=True, return_sequences=True)
 	[proj_h, x_att, alphas, h_state] = attentionLayer_SHARED([decoderEmbedding,encoderOut,initialDecodeState])
 	
@@ -51,13 +73,14 @@ def translationLSTMAttModel():
 	prevPrediction_SHARED = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE))
 	prevPrediction = prevPrediction_SHARED(decoderEmbedding)
 	
+	######FINAL PREDICTION STAGE
 	wordOut = layers.Add(activation='relu')([contextVector,decoderState,prevPrediction])
 	wordOut_SHARED_1 = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE))
 	wordOut = wordOut_SHARED_1(wordOut)
 	wordOut_SHARED_2 = layers.TimeDistributed(layers.Dense(OUTPUT_VOCABULARY_COUNT, activation="softmax"))
 	wordOut = wordOut_SHARED_2(wordOut)
 	
-	trainingModel = Model(inputs=[encoderWordInput,decoderInput],outputs=[wordOut])
+	trainingModel = Model(inputs=[encoderWordInput, encoderCharInput, decoderWordInput, decoderCharInput],outputs=[wordOut])
 	trainingModel.compile(optimizer=RMSprop(lr=8e-4),loss='categorical_crossentropy',metrics=['acc'])
 	
 
@@ -68,7 +91,7 @@ def translationLSTMAttModel():
 
 	###########
 	#first step prediction model creation start
-	samplingModelInit = Model(inputs=[encoderWordInput,decoderInput],outputs=[wordOut,encoderOut,h_state,alphas])
+	samplingModelInit = Model(inputs=[encoderWordInput, encoderCharInput, decoderWordInput, decoderCharInput],outputs=[wordOut,encoderOut,h_state,alphas])
 	samplingModelInit.compile(optimizer=RMSprop(lr=8e-4),loss='categorical_crossentropy',metrics=['acc'])
 
 	###########
@@ -86,8 +109,8 @@ def translationLSTMAttModel():
 	wordOut = wordOut_SHARED_1(wordOut)
 	wordOut = wordOut_SHARED_2(wordOut)
 	
-	samplingModelNext = Model(inputs=[preprocessedEncoder,previousAttState,decoderInput],outputs=[wordOut,preprocessedEncoder,h_state,alphas])
-	samplingModelNext.compile(optimizer=RMSprop(lr=8e-4),loss='categorical_crossentropy',metrics=['acc'])
+	samplingModelNext = Model(inputs=[preprocessedEncoder,previousAttState, decoderWordInput, decoderCharInput], outputs=[wordOut,preprocessedEncoder,h_state,alphas])
+	samplingModelNext.compile(optimizer=RMSprop(lr=8e-4), loss='categorical_crossentropy', metrics=['acc'])
 
 
 	return trainingModel, [samplingModelInit, samplingModelNext]

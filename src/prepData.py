@@ -196,6 +196,7 @@ def wordEncoding(data):
 
 	encoding.insert(0,CONST.MASK_TOKEN)
 	encoding.append(CONST.UNKNOWN_TOKEN)			# unknown 
+	encoding.append(CONST.START_OF_SEQUENCE_TOKEN)	# start of sequence
 	encoding.append(CONST.END_OF_SEQUENCE_TOKEN)	# end of sequence
 	
 	print("word encoding size : "+str(len(encoding)))
@@ -209,6 +210,7 @@ def charEncoding(data):
 
 	encoding.insert(0,CONST.MASK_TOKEN)
 	encoding.append(CONST.UNKNOWN_TOKEN)			# unknown 
+	encoding.append(CONST.START_OF_SEQUENCE_TOKEN)	# start of sequence
 	encoding.append(CONST.END_OF_SEQUENCE_TOKEN)	# end of sequence
 
 	print("char encoding size : "+str(len(encoding)))
@@ -238,21 +240,18 @@ def saveEncodedData(data, dataName):
 def encodeWords(data,encodingName):
 	encodedData = np.zeros((len(data), CONST.MAX_WORDS+1),dtype="uint16")			#initialize zero array
 
-
 	with open(CONST.ENCODING_PATH+encodingName+"_word.json", "r") as f:
 		encoding = json.load(f)
 	encoding = {word:i for i,word in enumerate(encoding)}
 
-
 	for i,line in enumerate(data):
+		encodedData[i][0] = encoding[CONST.START_OF_SEQUENCE_TOKEN]
 		for j,word in enumerate(line.split(CONST.UNIT_SEP)):
 			try:
-				encodedData[i][j] = encoding[word]
+				encodedData[i][j+1] = encoding[word]
 			except KeyError:
-				encodedData[i][j] = encoding[CONST.UNKNOWN_TOKEN]
-		j += 1
-		encodedData[i][j] = encoding[CONST.END_OF_SEQUENCE_TOKEN]
-
+				encodedData[i][j+1] = encoding[CONST.UNKNOWN_TOKEN]
+		encodedData[i][j+2] = encoding[CONST.END_OF_SEQUENCE_TOKEN]
 
 	return encodedData
 
@@ -271,9 +270,9 @@ def encodeChars(data,encodingName):
 		for j,word in enumerate(line.split(CONST.UNIT_SEP)):
 			for k,ch in enumerate(word):
 				try:
-					encodedData[i][j][k] = encoding[ch]
+					encodedData[i][j+1][k] = encoding[ch]
 				except KeyError:
-					encodedData[i][j][k] = encoding[CONST.UNKNOWN_TOKEN]
+					encodedData[i][j+1][k] = encoding[CONST.UNKNOWN_TOKEN]
 
 	return encodedData
 
@@ -290,9 +289,10 @@ def loadEncodedData():
 	frCharForwardData = frCharForwardData[:CONST.DATA_COUNT].copy()
 	frCharBackwardData = frCharBackwardData[:CONST.DATA_COUNT].copy()
 
-	shape = frCharForwardData.shape
-	frCharForwardData = np.reshape(frCharForwardData, (shape[0], shape[1] * shape[2]))
-	frCharBackwardData = np.reshape(frCharBackwardData, (shape[0], shape[1] * shape[2]))
+	frCharData = np.concatenate((frCharForwardData, frCharBackwardData), axis=2)
+
+	shape = frCharData.shape
+	frCharData = np.reshape(frCharData, (shape[0], shape[1] * shape[2]))
 
 
 	# retrieve english
@@ -305,13 +305,14 @@ def loadEncodedData():
 	enWordData = enWordData[:CONST.DATA_COUNT].copy()
 	enCharForwardData = enCharForwardData[:CONST.DATA_COUNT].copy()
 	enCharBackwardData = enCharBackwardData[:CONST.DATA_COUNT].copy()
+	
+	enCharData = np.concatenate((enCharForwardData, enCharBackwardData), axis=2)
 
-	shape = enCharForwardData.shape
-	enCharForwardData = np.reshape(enCharForwardData, (shape[0], shape[1] * shape[2]))
-	enCharBackwardData = np.reshape(enCharBackwardData, (shape[0], shape[1] * shape[2]))
+	shape = enCharData.shape
+	enCharData = np.reshape(enCharData, (shape[0], shape[1] * shape[2]))
 
 
-	return (frWordData, frCharForwardData, frCharBackwardData), (enWordData, enCharForwardData, enCharBackwardData)
+	return (frWordData, frCharData), (enWordData, enCharData)
 	
 
 
