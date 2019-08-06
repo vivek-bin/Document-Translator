@@ -238,7 +238,7 @@ def saveEncodedData(data, dataName):
 
 
 def encodeWords(data,encodingName):
-	encodedData = np.zeros((len(data), CONST.MAX_WORDS+1),dtype="uint16")			#initialize zero array
+	encodedData = np.zeros((len(data), CONST.INPUT_SEQUENCE_LENGTH),dtype="uint16")			#initialize zero array
 
 	with open(CONST.ENCODING_PATH+encodingName+"_word.json", "r") as f:
 		encoding = json.load(f)
@@ -258,7 +258,7 @@ def encodeWords(data,encodingName):
 
 
 def encodeChars(data,encodingName):
-	encodedData = np.zeros((len(data), CONST.MAX_WORDS+1,CONST.CHAR_INPUT_SIZE),dtype="uint8")			#initialize zero array
+	encodedData = np.zeros((len(data), CONST.INPUT_SEQUENCE_LENGTH, CONST.CHAR_INPUT_SIZE),dtype="uint8")			#initialize zero array
 
 
 	with open(CONST.ENCODING_PATH+encodingName+"_char.json", "r") as f:
