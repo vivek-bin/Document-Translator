@@ -74,14 +74,14 @@ def translationLSTMAttModel():
 	prevPrediction = prevPrediction_SHARED(decoderEmbedding)
 	
 	######FINAL PREDICTION STAGE
-	wordOut = layers.Add(activation='relu')([contextVector,decoderState,prevPrediction])
+	wordOut = layers.Add(activation="relu")([contextVector,decoderState,prevPrediction])
 	wordOut_SHARED_1 = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE))
 	wordOut = wordOut_SHARED_1(wordOut)
 	wordOut_SHARED_2 = layers.TimeDistributed(layers.Dense(OUTPUT_VOCABULARY_COUNT, activation="softmax"))
 	wordOut = wordOut_SHARED_2(wordOut)
 	
 	trainingModel = Model(inputs=[encoderWordInput, encoderCharInput, decoderWordInput, decoderCharInput],outputs=[wordOut])
-	trainingModel.compile(optimizer=RMSprop(lr=8e-4),loss='categorical_crossentropy',metrics=['acc'])
+	trainingModel.compile(optimizer=RMSprop(lr=8e-4),loss="categorical_crossentropy",metrics=["acc"])
 	
 
 
@@ -92,7 +92,7 @@ def translationLSTMAttModel():
 	###########
 	#first step prediction model creation start
 	samplingModelInit = Model(inputs=[encoderWordInput, encoderCharInput, decoderWordInput, decoderCharInput],outputs=[wordOut,encoderOut,h_state,alphas])
-	samplingModelInit.compile(optimizer=RMSprop(lr=8e-4),loss='categorical_crossentropy',metrics=['acc'])
+	samplingModelInit.compile(optimizer=RMSprop(lr=8e-4),loss="categorical_crossentropy",metrics=["acc"])
 
 	###########
 	#next steps prediction model creation start
@@ -105,24 +105,24 @@ def translationLSTMAttModel():
 	contextVector = contextVector_SHARED(x_att)
 	prevPrediction = prevPrediction_SHARED(decoderEmbedding)
 	
-	wordOut = layers.Add(activation='relu')([contextVector,decoderState,prevPrediction])
+	wordOut = layers.Add(activation="relu")([contextVector,decoderState,prevPrediction])
 	wordOut = wordOut_SHARED_1(wordOut)
 	wordOut = wordOut_SHARED_2(wordOut)
 	
 	samplingModelNext = Model(inputs=[preprocessedEncoder,previousAttState, decoderWordInput, decoderCharInput], outputs=[wordOut,preprocessedEncoder,h_state,alphas])
-	samplingModelNext.compile(optimizer=RMSprop(lr=8e-4), loss='categorical_crossentropy', metrics=['acc'])
+	samplingModelNext.compile(optimizer=RMSprop(lr=8e-4), loss="categorical_crossentropy", metrics=["acc"])
 
 
 	return trainingModel, [samplingModelInit, samplingModelNext]
 	
 
 def customAttentionLayer():
-	###########attention implementation
+	########### attention implementation
 	decoderEmbedding = layers.Input(shape=(None,CONST.NUM_LSTM_UNITS*2))
 	encoderOut = layers.Input(shape=(None,CONST.NUM_LSTM_UNITS*2))
 
 
-	decoderLSTM, decoderStates = layers.LSTM(CONST.NUM_LSTM_UNITS, return_states=True)(decoderEmbedding)
+	decoderLSTM, decoderStates = layers.LSTM(CONST.NUM_LSTM_UNITS, return_states=True, return_sequences=True)(decoderEmbedding)
 	decoderToAtt = layers.RepeatVector(CONST.INPUT_SEQUENCE_LENGTH)(decoderLSTM)
 	attentionInput = layers.Concatenate([encoderOut,decoderToAtt])
 	attentionFC = layers.Dense(CONST.NUM_LSTM_UNITS)(attentionInput)
