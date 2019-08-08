@@ -120,9 +120,10 @@ def customAttentionLayer():
 	########### attention implementation
 	decoderEmbedding = layers.Input(shape=(None,CONST.NUM_LSTM_UNITS*2))
 	encoderOut = layers.Input(shape=(None,CONST.NUM_LSTM_UNITS*2))
+	attentionState = layers.Input(shape=(None,CONST.NUM_LSTM_UNITS))
 
 
-	decoderLSTM, decoderStates = layers.LSTM(CONST.NUM_LSTM_UNITS, return_states=True, return_sequences=True)(decoderEmbedding)
+	decoderLSTM, decoderStates = layers.LSTM(CONST.NUM_LSTM_UNITS, return_states=True, return_sequences=True)(decoderEmbedding, initial_state=attentionState)
 	decoderToAtt = layers.RepeatVector(CONST.INPUT_SEQUENCE_LENGTH)(decoderLSTM)
 	attentionInput = layers.Concatenate([encoderOut,decoderToAtt])
 	attentionFC = layers.Dense(CONST.NUM_LSTM_UNITS)(attentionInput)

@@ -673,3 +673,5 @@ class AttLSTMCond(Recurrent):
         extra_states = [initial_state, initial_state_alphas]  # (samples, ctx_dim)
 
         return initial_states + extra_states
+
+
