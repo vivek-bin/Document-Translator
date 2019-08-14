@@ -63,7 +63,7 @@ def translationLSTMAttModel():
 	initialDecodeState = layers.Flatten(axis=1)(initialDecodeState)
 	
 	######ATTENTION
-	attentionLayer_SHARED = AttLSTMCond(CONST.NUM_LSTM_UNITS, return_extra_variables=True, return_states=True, return_sequences=True)
+	attentionLayer_SHARED = customAttentionLayer()
 	[proj_h, x_att, alphas, h_state] = attentionLayer_SHARED([decoderEmbedding,encoderOut,initialDecodeState])
 	
 	decoderState_SHARED = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE))
@@ -116,24 +116,26 @@ def translationLSTMAttModel():
 	return trainingModel, [samplingModelInit, samplingModelNext]
 	
 
+
 def customAttentionLayer():
 	########### attention implementation
 	decoderEmbedding = layers.Input(shape=(None,CONST.NUM_LSTM_UNITS*2))
 	encoderOut = layers.Input(shape=(None,CONST.NUM_LSTM_UNITS*2))
 	attentionState = layers.Input(shape=(None,CONST.NUM_LSTM_UNITS))
 
-
 	decoderLSTM, decoderStates = layers.LSTM(CONST.NUM_LSTM_UNITS, return_states=True, return_sequences=True)(decoderEmbedding, initial_state=attentionState)
-	decoderToAtt = layers.RepeatVector(CONST.INPUT_SEQUENCE_LENGTH)(decoderLSTM)
-	attentionInput = layers.Concatenate([encoderOut,decoderToAtt])
-	attentionFC = layers.Dense(CONST.NUM_LSTM_UNITS)(attentionInput)
-	attentionFC = layers.Dense(1)(attentionFC)
-	attentionAlpha = layers.Activation("softmax")(attentionFC)
-	attentionAlpha = layers.Flatten()(attentionAlpha)
-	attentionAlpha = layers.RepeatVector(CONST.NUM_LSTM_UNITS)(attentionAlpha)
-	contextOut = layers.Multiply()([encoderOut,attentionAlpha])
 
-	return contextOut, decoderStates
+	#generate alphas
+	alpha = layers.dot([decoderLSTM, encoderOut],axes=2)
+	alpha = layers.TimeDistributed(layers.Activation("softmax"))(alpha)
+
+	#create weighted encoder context
+	permEncoderOut = layers.Permute((2,1))(encoderOut)
+	contextOut = layers.dot([alpha, permEncoderOut], axes=2)
+
+	attentionModel = Model(inputs=[encoderOut,attentionState, decoderEmbedding], outputs=[contextOut, decoderStates, alpha])
+
+	return attentionModel
 
 
 def saveModel(model,modelName):
