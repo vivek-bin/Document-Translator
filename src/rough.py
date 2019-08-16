@@ -65,6 +65,32 @@ def dotLayerTry():
   #print(model.predict([enc,dec])[0])
   print(model.predict([enc,dec]))
 
+
+
+def multiPartModel():
+  import keras
+
+  models = []
+  for i in range(5):
+    ip = keras.layers.Input(batch_shape=(None,10))
+    d = keras.layers.Dense(10)(ip)
+
+    models.append(keras.models.Model(inputs=ip, outputs=d))
+
+  ip = keras.layers.Input(batch_shape=(None,10))
+  op = ip
+  
+  for i in range(5):
+    op = models[i](op)
+
+  fmodel = keras.models.Model(inputs=ip, outputs=op)
+  fmodel.compile(optimizer=keras.optimizers.RMSprop(lr=8e-4),loss="categorical_crossentropy",metrics=["acc"])
+
+
+  fmodel.summary()
+
+  print(fmodel.layers[4].layers[1].name)
+  return fmodel
   
   
-dotLayerTry()
+multiPartModel()
