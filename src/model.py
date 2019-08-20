@@ -4,6 +4,7 @@ from keras import layers
 from keras.optimizers import RMSprop
 import json
 import keras.backend as K
+from keras.callbacks import ModelCheckpoint
 
 import prepData as PD
 import constants as CONST
@@ -134,33 +135,33 @@ def outputStage(OUTPUT_VOCABULARY_COUNT):
 	return outputStage
 
 
-def saveModels(trainModel, samplingModels, modelName, saveWeights=True):
+def saveModels(trainingModel, modelName, samplingModels=False, saveWeights=True):
 	# serialize model to JSON
 	with open(CONST.MODEL_PATH + modelName + "_train.json", "w") as json_file:
-		json_file.write(trainModel.to_json())
-	with open(CONST.MODEL_PATH + modelName + "_sampInit.json", "w") as json_file:
-		json_file.write(samplingModels[0].to_json())
-	with open(CONST.MODEL_PATH + modelName + "_sampNext.json", "w") as json_file:
-		json_file.write(samplingModels[1].to_json())
+		json_file.write(trainingModel.to_json())
+	if samplingModels:
+		with open(CONST.MODEL_PATH + modelName + "_sampInit.json", "w") as json_file:
+			json_file.write(samplingModels[0].to_json())
+		with open(CONST.MODEL_PATH + modelName + "_sampNext.json", "w") as json_file:
+			json_file.write(samplingModels[1].to_json())
 	
 	if saveWeights:
 		# serialize weights to HDF5
-		trainModel.save_weights(CONST.MODEL_PATH + modelName + ".h5")
+		trainingModel.save_weights(CONST.MODEL_PATH + modelName + ".h5")
 		
 	print("Saved model to disk")
 	
 
 def main():
 	trainingModel, samplingModels = translationLSTMAttModel()
-	saveModels(trainingModel, samplingModels, modelName="AttLSTM", saveWeights=False)
+	saveModels(trainingModel, samplingModels=samplingModels, modelName="AttLSTM", saveWeights=False)
 	trainingModel.summary()
+	trainingModel.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["sparse_categorical_accuracy"])
 
 	(xTrain, yTrain), (xTest, yTest) = PD.getFrToEngData()
+	history = trainingModel.fit(x=xTrain, y=yTrain, epochs=500, batch_size=128, validation_split=0.2, callbacks=[ModelCheckpoint(CONST.MODEL_PATH + "AttLSTMTrained-{epoch:02d}-{val_acc:.2f}.hdf5", monitor='sparse_categorical_accuracy', mode='max')])
 
-	trainingModel.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["sparse_categorical_accuracy"])
-	history = trainingModel.fit(x=xTrain, y=yTrain, epochs=50, batch_size=128, validation_split=0.2)
-
-	saveModels(trainingModel, samplingModels, modelName="AttLSTMTrained")
+	saveModels(trainingModel, modelName="AttLSTMTrained")
 
 	# scores = trainingModel.evaluate(xTest, yTest, verbose=0)
 	# print("%s: %.2f%%" % (trainingModel.metrics_names[1], scores[1]*100))
