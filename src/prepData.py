@@ -277,44 +277,41 @@ def encodeChars(data,encodingName):
 	return encodedData
 
 
-def loadEncodedData():
-	# retrieve french
-	data = np.load(CONST.PROCESSED_DATA + "frEncodedData.npz")
-	frWordData = data["encoded"]
-	frCharForwardData = data["charForwardEncoded"]
-	frCharBackwardData = data["charBackwardEncoded"]
+def loadEncodedData(fileName):
+	data = np.load(CONST.PROCESSED_DATA + fileName + ".npz")
+	wordData = data["encoded"]
+	charForwardData = data["charForwardEncoded"]
+	charBackwardData = data["charBackwardEncoded"]
 	data = None
 
-	frWordData = frWordData[:CONST.DATA_COUNT].copy()
-	frCharForwardData = frCharForwardData[:CONST.DATA_COUNT].copy()
-	frCharBackwardData = frCharBackwardData[:CONST.DATA_COUNT].copy()
+	wordData = wordData[:CONST.DATA_COUNT].copy()
+	charForwardData = charForwardData[:CONST.DATA_COUNT].copy()
+	charBackwardData = charBackwardData[:CONST.DATA_COUNT].copy()
 
-	frCharData = np.concatenate((frCharForwardData, frCharBackwardData), axis=2)
+	charData = np.concatenate((charForwardData, charBackwardData), axis=2)
 
-	shape = frCharData.shape
-	frCharData = np.reshape(frCharData, (shape[0], shape[1] * shape[2]))
+	shape = charData.shape
+	charData = np.reshape(charData, (shape[0], shape[1] * shape[2]))
 
-
-	# retrieve english
-	data = np.load(CONST.PROCESSED_DATA + "enEncodedData.npz")
-	enWordData = data["encoded"]
-	enCharForwardData = data["charForwardEncoded"]
-	enCharBackwardData = data["charBackwardEncoded"]
-	data = None
-
-	enWordData = enWordData[:CONST.DATA_COUNT].copy()
-	enCharForwardData = enCharForwardData[:CONST.DATA_COUNT].copy()
-	enCharBackwardData = enCharBackwardData[:CONST.DATA_COUNT].copy()
-	
-	enCharData = np.concatenate((enCharForwardData, enCharBackwardData), axis=2)
-
-	shape = enCharData.shape
-	enCharData = np.reshape(enCharData, (shape[0], shape[1] * shape[2]))
-
-
-	return (frWordData, frCharData), (enWordData, enCharData)
+	return wordData, charData
 	
 
+def getFrToEngData():
+	fr = loadEncodedData("frEncodedData")
+	en = loadEncodedData("enEncodedData")
+
+	inputData = fr + en
+	outputData = en[0]
+	outputData = np.pad(outputData,((0,0),(0,1)), mode='constant')[:,1:]
+	outputData = [np.expand_dims(outputData,axis=-1)]					#for sparse categorical
+
+	trainIn = [x[:CONST.TRAIN_SPLIT] for x in inputData]
+	testIn = [x[CONST.TRAIN_SPLIT:] for x in inputData]
+	
+	trainOut = [x[:CONST.TRAIN_SPLIT] for x in outputData]
+	testOut = [x[CONST.TRAIN_SPLIT:] for x in outputData]
+
+	return (trainIn, trainOut), (testIn, testOut)
 
 def main():
 	writeEncodingsData()

@@ -9,20 +9,6 @@ import prepData as PD
 import constants as CONST
 
 
-def getFrToEngData():
-	fr, en = PD.loadEncodedData()
-	inputData = fr + en
-	outputData = [en[0]]
-
-	trainIn = [x[:CONST.TRAIN_SPLIT] for x in inputData]
-	testIn = [x[CONST.TRAIN_SPLIT:] for x in inputData]
-	
-	trainOut = [x[:CONST.TRAIN_SPLIT] for x in outputData]
-	testOut = [x[CONST.TRAIN_SPLIT:] for x in outputData]
-
-	return (trainIn, trainOut), (testIn, testOut)
-
-
 def translationLSTMAttModel():
 	## get vocabulary sizes to build model
 	with open(CONST.ENCODING_PATH+"fr_word.json", "r") as f:
@@ -38,34 +24,33 @@ def translationLSTMAttModel():
 	################################
 	#training model creation start
 	################################
-	# ######ENCODER EMBEDDING
-	# encoderWordInput = layers.Input(batch_shape=(None,CONST.INPUT_SEQUENCE_LENGTH))
-	# encoderCharInput = layers.Input(batch_shape=(None,CONST.INPUT_SEQUENCE_LENGTH * CONST.CHAR_INPUT_SIZE * 2))		# forward and backwards
+	######ENCODER EMBEDDING
 	encoderWordInput = layers.Input(batch_shape=(None, None))
 	encoderCharInput = layers.Input(batch_shape=(None, None))		# forward and backwards
 	encoderEmbedding_SHARED = embeddingStage(INPUT_VOCABULARY_COUNT, INPUT_CHAR_VOCABULARY_COUNT)
 	encoderEmbedding = encoderEmbedding_SHARED([encoderWordInput, encoderCharInput])
 
-	# ######DECODER EMBEDDING
-	# decoderWordInput = layers.Input(batch_shape=(None,CONST.OUTPUT_SEQUENCE_LENGTH))
-	# decoderCharInput = layers.Input(batch_shape=(None,CONST.OUTPUT_SEQUENCE_LENGTH * CONST.CHAR_INPUT_SIZE * 2))		# forward and backwards
+	######DECODER EMBEDDING
 	decoderWordInput = layers.Input(batch_shape=(None, None))
 	decoderCharInput = layers.Input(batch_shape=(None, None))		# forward and backwards
-	decoderEmbedding = embeddingStage(OUTPUT_VOCABULARY_COUNT, OUTPUT_CHAR_VOCABULARY_COUNT)([decoderWordInput, decoderCharInput])
+	decoderEmbedding_SHARED = embeddingStage(OUTPUT_VOCABULARY_COUNT, OUTPUT_CHAR_VOCABULARY_COUNT)
+	decoderEmbedding = decoderEmbedding_SHARED([decoderWordInput, decoderCharInput])
 
 	######ENCODER PROCESSING STAGE
 	encoderOut, encoderForwardH, encoderForwardC, _, _ = layers.Bidirectional(layers.LSTM(CONST.NUM_LSTM_UNITS, return_sequences=True, return_state=True))(encoderEmbedding)
+	######DECODER PROCESSING STAGE
+	decoderOut_SHARED = layers.LSTM(CONST.NUM_LSTM_UNITS, return_state=True, return_sequences=True)
+	decoderOut, decoderH, decoderC = decoderOut_SHARED(decoderEmbedding, initial_state=[encoderForwardH, encoderForwardC])
 
 	######ATTENTION STAGE
 	attentionLayer_SHARED = attentionStage()
-	[contextOut, decoderOut, decoderH, decoderC, alphas] = attentionLayer_SHARED([encoderOut, encoderForwardH, encoderForwardC, decoderEmbedding])
+	[contextOut, alphas] = attentionLayer_SHARED([encoderOut, decoderOut])
 	
 	######FINAL PREDICTION STAGE
 	outputStage_SHARED = outputStage(OUTPUT_VOCABULARY_COUNT)
 	wordOut = outputStage_SHARED([contextOut, decoderOut, decoderEmbedding])
 
 	trainingModel = Model(inputs=[encoderWordInput, encoderCharInput, decoderWordInput, decoderCharInput], outputs=wordOut)
-	trainingModel.compile(optimizer=RMSprop(lr=8e-4), loss="sparse_categorical_crossentropy", metrics=["sparse_categorical_accuracy"])
 	
 
 
@@ -82,15 +67,16 @@ def translationLSTMAttModel():
 	previousDecoderH = layers.Input(batch_shape=(None, None, CONST.NUM_LSTM_UNITS))
 	previousDecoderC = layers.Input(batch_shape=(None, None, CONST.NUM_LSTM_UNITS))
 
-	[contextOut, decoderOut, decoderH, decoderC, alphas] = attentionLayer_SHARED([preprocessedEncoder, previousDecoderH, previousDecoderC, decoderEmbedding])	
+	decoderOut, decoderH, decoderC = decoderOut_SHARED(decoderEmbedding, initial_state=[previousDecoderH, previousDecoderC])
+	[contextOut, alphas] = attentionLayer_SHARED([preprocessedEncoder, decoderOut])
 	wordOut = outputStage_SHARED([contextOut, decoderOut, decoderEmbedding])
 	
 	samplingModelNext = Model(inputs=[preprocessedEncoder, previousDecoderH, previousDecoderC, decoderWordInput, decoderCharInput], outputs=[wordOut, preprocessedEncoder, decoderH, decoderC, alphas])
 
 
+
 	return trainingModel, (samplingModelInit, samplingModelNext)
 	
-
 
 def embeddingStage(VOCABULARY_COUNT, CHAR_VOCABULARY_COUNT):
 	#word embedding
@@ -108,14 +94,9 @@ def embeddingStage(VOCABULARY_COUNT, CHAR_VOCABULARY_COUNT):
 
 
 def attentionStage():
-	decoderEmbedding = layers.Input(batch_shape=(None,None,CONST.WORD_EMBEDDING_SIZE + CONST.CHAR_EMBEDDING_SIZE*CONST.CHAR_INPUT_SIZE*2))
 	encoderOut = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS*2))
-	decoderInitialH = layers.Input(batch_shape=(None,CONST.NUM_LSTM_UNITS))
-	decoderInitialC = layers.Input(batch_shape=(None,CONST.NUM_LSTM_UNITS))
+	decoderOut = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS))
 
-	#build decoder context
-	decoderOut, decoderH, decoderC = layers.LSTM(CONST.NUM_LSTM_UNITS, return_state=True, return_sequences=True)(decoderEmbedding, initial_state=[decoderInitialH, decoderInitialC])
-	
 	#key query pair
 	decoderAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS))(decoderOut)
 	encoderAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS))(encoderOut)
@@ -128,7 +109,7 @@ def attentionStage():
 	permEncoderOut = layers.Permute((2,1))(encoderOut)
 	contextOut = layers.dot([alphas, permEncoderOut], axes=2)
 
-	attentionModel = Model(inputs=[encoderOut, decoderInitialH, decoderInitialC, decoderEmbedding], outputs=[contextOut, decoderOut, decoderH, decoderC, alphas], name="attention")
+	attentionModel = Model(inputs=[encoderOut, decoderOut], outputs=[contextOut, alphas], name="attention")
 	return attentionModel
 
 
@@ -153,7 +134,7 @@ def outputStage(OUTPUT_VOCABULARY_COUNT):
 	return outputStage
 
 
-def saveModels(trainModel, samplingModels, modelName):
+def saveModels(trainModel, samplingModels, modelName, saveWeights=True):
 	# serialize model to JSON
 	with open(CONST.MODEL_PATH + modelName + "_train.json", "w") as json_file:
 		json_file.write(trainModel.to_json())
@@ -162,26 +143,30 @@ def saveModels(trainModel, samplingModels, modelName):
 	with open(CONST.MODEL_PATH + modelName + "_sampNext.json", "w") as json_file:
 		json_file.write(samplingModels[1].to_json())
 	
-	# serialize weights to HDF5
-	trainModel.save_weights(CONST.MODEL_PATH + modelName + ".h5")
+	if saveWeights:
+		# serialize weights to HDF5
+		trainModel.save_weights(CONST.MODEL_PATH + modelName + ".h5")
+		
 	print("Saved model to disk")
 	
 
-if __name__ == "__main__":
-	(xTrain, yTrain), (xTest, yTest) = getFrToEngData()
-
+def main():
 	trainingModel, samplingModels = translationLSTMAttModel()
-
-	saveModels(trainingModel, samplingModels, "AttLSTM")
-
+	saveModels(trainingModel, samplingModels, modelName="AttLSTM", saveWeights=False)
 	trainingModel.summary()
 
+	(xTrain, yTrain), (xTest, yTest) = PD.getFrToEngData()
 
+	trainingModel.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["sparse_categorical_accuracy"])
 	history = trainingModel.fit(x=xTrain, y=yTrain, epochs=50, batch_size=128, validation_split=0.2)
 
-	saveModels(trainingModel, samplingModels, "AttLSTMTrained")
+	saveModels(trainingModel, samplingModels, modelName="AttLSTMTrained")
 
 	# scores = trainingModel.evaluate(xTest, yTest, verbose=0)
 	# print("%s: %.2f%%" % (trainingModel.metrics_names[1], scores[1]*100))
+
+
+if __name__ == "__main__":
+	main()
 
 
