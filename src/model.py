@@ -38,7 +38,8 @@ def translationLSTMAttModel():
 	decoderEmbedding = decoderEmbedding_SHARED([decoderWordInput, decoderCharInput])
 
 	######ENCODER PROCESSING STAGE
-	encoderOut, encoderForwardH, encoderForwardC, _, _ = layers.Bidirectional(layers.LSTM(CONST.NUM_LSTM_UNITS, return_sequences=True, return_state=True))(encoderEmbedding)
+	encoderOut_SHARED = layers.Bidirectional(layers.LSTM(CONST.NUM_LSTM_UNITS, return_sequences=True, return_state=True))
+	encoderOut, encoderForwardH, encoderForwardC, _, _ = encoderOut_SHARED(encoderEmbedding)
 	######DECODER PROCESSING STAGE
 	decoderOut_SHARED = layers.LSTM(CONST.NUM_LSTM_UNITS, return_state=True, return_sequences=True)
 	decoderOut, decoderH, decoderC = decoderOut_SHARED(decoderEmbedding, initial_state=[encoderForwardH, encoderForwardC])
@@ -89,6 +90,7 @@ def embeddingStage(VOCABULARY_COUNT, CHAR_VOCABULARY_COUNT):
 	charEmbedding = layers.Reshape(target_shape=(-1, CONST.CHAR_INPUT_SIZE * 2 * CONST.CHAR_EMBEDDING_SIZE))(charEmbedding)
 	#final input embedding
 	embedding = layers.concatenate([wordEmbedding, charEmbedding])
+	embedding = layers.BatchNormalization()(embedding)
 
 	embeddingModel = Model(inputs=[wordInput, charInput], outputs=[embedding])
 	return embeddingModel
@@ -98,16 +100,18 @@ def attentionStage():
 	encoderOut = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS*2))
 	decoderOut = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS))
 
+	encoderOutNorm = layers.BatchNormalization()(encoderOut)
+	decoderOutNorm = decoderOut#layers.BatchNormalization()(decoderOut)
 	#key query pair
-	decoderAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS))(decoderOut)
-	encoderAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS))(encoderOut)
+	decoderAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS))(decoderOutNorm)
+	encoderAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS))(encoderOutNorm)
 	
 	#generate alphas
 	alphas = layers.dot([decoderAttentionIn, encoderAttentionIn],axes=2)
 	alphas = layers.TimeDistributed(layers.Activation("softmax"))(alphas)
 
 	#create weighted encoder context
-	permEncoderOut = layers.Permute((2,1))(encoderOut)
+	permEncoderOut = layers.Permute((2,1))(encoderOutNorm)
 	contextOut = layers.dot([alphas, permEncoderOut], axes=2)
 
 	attentionModel = Model(inputs=[encoderOut, decoderOut], outputs=[contextOut, alphas], name="attention")
@@ -119,14 +123,18 @@ def outputStage(OUTPUT_VOCABULARY_COUNT):
 	decoderOut = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS))
 	contextOut = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS*2))
 
+	contextOutNorm = layers.BatchNormalization()(contextOut)
+	decoderOutNorm = layers.BatchNormalization()(decoderOut)
 	#prepare different inputs for prediction
-	decoderOutFinal = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE))(decoderOut)
-	contextFinal = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE))(contextOut)
+	decoderOutFinal = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE))(decoderOutNorm)
+	contextFinal = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE))(contextOutNorm)
 	prevWordFinal = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE))(decoderEmbedding)
 
 	#combine
 	wordOut = layers.Add()([contextFinal, decoderOutFinal, prevWordFinal])
+	wordOut = layers.BatchNormalization()(wordOut)
 	wordOut = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE))(wordOut)
+	wordOut = layers.BatchNormalization()(wordOut)
 
 	#word prediction
 	wordOut = layers.TimeDistributed(layers.Dense(OUTPUT_VOCABULARY_COUNT, activation="softmax"))(wordOut)
@@ -159,7 +167,8 @@ def main():
 	trainingModel.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["sparse_categorical_accuracy"])
 
 	(xTrain, yTrain), (xTest, yTest) = PD.getFrToEngData()
-	history = trainingModel.fit(x=xTrain, y=yTrain, epochs=500, batch_size=128, validation_split=0.2, callbacks=[ModelCheckpoint(CONST.MODEL_PATH + "AttLSTMTrained-{epoch:02d}-{val_acc:.2f}.hdf5", monitor='sparse_categorical_accuracy', mode='max')])
+	trainingCallbacks = [ModelCheckpoint(CONST.MODEL_PATH + "AttLSTMTrained-{epoch:02d}-{sparse_categorical_accuracy:.2f}.hdf5", monitor='sparse_categorical_accuracy', mode='max')]
+	history = trainingModel.fit(x=xTrain, y=yTrain, epochs=5, batch_size=128, validation_split=0.2, callbacks=trainingCallbacks)
 
 	saveModels(trainingModel, modelName="AttLSTMTrained")
 

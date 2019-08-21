@@ -1,6 +1,5 @@
 # coding: utf-8
 
-import numpy
 import constants as CONST
 import fileaccess as FA
 import string

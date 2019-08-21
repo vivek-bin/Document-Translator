@@ -33,7 +33,7 @@ HANSARDS_SENATE_TEST = HANSARDS_SENATE + "testing/"
 PROCESSED_DATA = DATA + "processed input/"
 
 
-DATA_COUNT = int(1.0 * 1000 * 1000)
+DATA_COUNT = int(0.01 * 1000 * 1000)
 
 UNIT_SEP = "\x1f"
 MASK_TOKEN = "MASK"
