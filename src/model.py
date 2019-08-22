@@ -1,13 +1,51 @@
 import numpy as np
+from keras.models import load_model
 from keras.models import Model
 from keras import layers
 from keras.optimizers import RMSprop
 import json
 import keras.backend as K
 from keras.callbacks import ModelCheckpoint
+import os
 
-import prepData as PD
 import constants as CONST
+
+
+def loadEncodedData(fileName):
+	data = np.load(CONST.PROCESSED_DATA + fileName + ".npz")
+	wordData = data["encoded"]
+	charForwardData = data["charForwardEncoded"]
+	charBackwardData = data["charBackwardEncoded"]
+	data = None
+
+	wordData = wordData[:CONST.DATA_COUNT].copy()
+	charForwardData = charForwardData[:CONST.DATA_COUNT].copy()
+	charBackwardData = charBackwardData[:CONST.DATA_COUNT].copy()
+
+	charData = np.concatenate((charForwardData, charBackwardData), axis=2)
+
+	shape = charData.shape
+	charData = np.reshape(charData, (shape[0], shape[1] * shape[2]))
+
+	return wordData, charData
+	
+
+def getFrToEngData():
+	fr = loadEncodedData("frEncodedData")
+	en = loadEncodedData("enEncodedData")
+
+	inputData = fr + en
+	outputData = en[0]
+	outputData = np.pad(outputData,((0,0),(0,1)), mode='constant')[:,1:]
+	outputData = [np.expand_dims(outputData,axis=-1)]					#for sparse categorical
+
+	trainIn = [x[:CONST.TRAIN_SPLIT] for x in inputData]
+	testIn = [x[CONST.TRAIN_SPLIT:] for x in inputData]
+	
+	trainOut = [x[:CONST.TRAIN_SPLIT] for x in outputData]
+	testOut = [x[CONST.TRAIN_SPLIT:] for x in outputData]
+
+	return (trainIn, trainOut), (testIn, testOut)
 
 
 def translationLSTMAttModel():
@@ -90,7 +128,7 @@ def embeddingStage(VOCABULARY_COUNT, CHAR_VOCABULARY_COUNT):
 	charEmbedding = layers.Reshape(target_shape=(-1, CONST.CHAR_INPUT_SIZE * 2 * CONST.CHAR_EMBEDDING_SIZE))(charEmbedding)
 	#final input embedding
 	embedding = layers.concatenate([wordEmbedding, charEmbedding])
-	#embedding = layers.BatchNormalization()(embedding)
+	embedding = layers.TimeDistributed(layers.BatchNormalization())(embedding)
 
 	embeddingModel = Model(inputs=[wordInput, charInput], outputs=[embedding])
 	return embeddingModel
@@ -102,8 +140,8 @@ def attentionStage():
 
 	encoderOutNorm = encoderOut
 	decoderOutNorm = decoderOut
-	#encoderOutNorm = layers.BatchNormalization()(encoderOutNorm)
-	#decoderOutNorm = layers.BatchNormalization()(decoderOutNorm)
+	encoderOutNorm = layers.TimeDistributed(layers.BatchNormalization())(encoderOutNorm)
+	decoderOutNorm = layers.TimeDistributed(layers.BatchNormalization())(decoderOutNorm)
 	#key query pair
 	decoderAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS))(decoderOutNorm)
 	encoderAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS))(encoderOutNorm)
@@ -127,8 +165,8 @@ def outputStage(OUTPUT_VOCABULARY_COUNT):
 
 	contextOutNorm = contextOut
 	decoderOutNorm = decoderOut
-	#contextOutNorm = layers.BatchNormalization()(contextOutNorm)
-	#decoderOutNorm = layers.BatchNormalization()(decoderOutNorm)
+	contextOutNorm = layers.TimeDistributed(layers.BatchNormalization())(contextOutNorm)
+	decoderOutNorm = layers.TimeDistributed(layers.BatchNormalization())(decoderOutNorm)
 	#prepare different inputs for prediction
 	decoderOutFinal = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE))(decoderOutNorm)
 	contextFinal = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE))(contextOutNorm)
@@ -136,9 +174,9 @@ def outputStage(OUTPUT_VOCABULARY_COUNT):
 
 	#combine
 	wordOut = layers.Add()([contextFinal, decoderOutFinal, prevWordFinal])
-	#wordOut = layers.BatchNormalization()(wordOut)
+	wordOut = layers.TimeDistributed(layers.BatchNormalization())(wordOut)
 	wordOut = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE))(wordOut)
-	#wordOut = layers.BatchNormalization()(wordOut)
+	wordOut = layers.TimeDistributed(layers.BatchNormalization())(wordOut)
 
 	#word prediction
 	wordOut = layers.TimeDistributed(layers.Dense(OUTPUT_VOCABULARY_COUNT, activation="softmax"))(wordOut)
@@ -147,7 +185,7 @@ def outputStage(OUTPUT_VOCABULARY_COUNT):
 	return outputStage
 
 
-def saveModels(trainingModel, modelName, samplingModels=False, saveWeights=True):
+def saveModels(trainingModel, modelName, samplingModels=False):
 	# serialize model to JSON
 	with open(CONST.MODEL_PATH + modelName + "_train.json", "w") as json_file:
 		json_file.write(trainingModel.to_json())
@@ -157,28 +195,56 @@ def saveModels(trainingModel, modelName, samplingModels=False, saveWeights=True)
 		with open(CONST.MODEL_PATH + modelName + "_sampNext.json", "w") as json_file:
 			json_file.write(samplingModels[1].to_json())
 	
-	if saveWeights:
-		# serialize weights to HDF5
-		trainingModel.save_weights(CONST.MODEL_PATH + modelName + ".h5")
-		
-	print("Saved model to disk")
+	print("Saved model structure")
 	
 
-def main():
+def evaluateModel(model, xTest, yTest):
+	scores = model.evaluate(xTest, yTest, verbose=0)
+	print("%s: %.2f%%" % (model.metrics_names[1], scores[1]*100))
+
+
+def getLastCheckpoint():
+	m = [fileName for fileName in os.listdir(CONST.MODEL_PATH) if fileName.startswith(CONST.MODEL_CHECKPOINT_NAME_START) and fileName.endswith(CONST.MODEL_CHECKPOINT_NAME_END)]
+	if m:
+		return sorted(m)[-1]
+	else:
+		return False
+
+def trainModel():
+	#get model
 	trainingModel, samplingModels = translationLSTMAttModel()
-	saveModels(trainingModel, samplingModels=samplingModels, modelName="AttLSTM", saveWeights=False)
-	trainingModel.summary()
 	trainingModel.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["sparse_categorical_accuracy"])
+	trainingModel.summary()
 
-	(xTrain, yTrain), (_, _) = PD.getFrToEngData()
-	trainingCallbacks = [ModelCheckpoint(CONST.MODEL_PATH + "AttLSTMTrained-{epoch:02d}-{sparse_categorical_accuracy:.2f}.hdf5", monitor='sparse_categorical_accuracy', mode='max')]
-	_ = trainingModel.fit(x=xTrain, y=yTrain, epochs=5, batch_size=4, validation_split=0.2, callbacks=trainingCallbacks)
+	initialEpoch = 0
+	#load from checkpoint if provided
+	checkPointName = getLastCheckpoint()
+	if checkPointName:
+		trainingModel.load_weights(CONST.MODEL_PATH + checkPointName)
+		tempModel = load_model(CONST.MODEL_PATH + checkPointName)
+		trainingModel._make_train_function()
+		weight_values = K.batch_get_value(getattr(tempModel.optimizer, 'weights'))
+		trainingModel.optimizer.set_weights(weight_values)
 
-	saveModels(trainingModel, modelName="AttLSTMTrained")
+		initialEpoch = int(checkPointName[len(CONST.MODEL_CHECKPOINT_NAME_START):][:4])
 
-	# scores = trainingModel.evaluate(xTest, yTest, verbose=0)
-	# print("%s: %.2f%%" % (trainingModel.metrics_names[1], scores[1]*100))
 
+	# load all data
+	(xTrain, yTrain), (_, _) = getFrToEngData()
+
+
+	# start training
+	callbacks = []
+	callbacks.append(ModelCheckpoint(CONST.MODEL_PATH + CONST.MODEL_CHECKPOINT_NAME, monitor='sparse_categorical_accuracy', mode='max',save_best_only=True))
+	_ = trainingModel.fit(x=xTrain, y=yTrain, epochs=CONST.NUM_EPOCHS, batch_size=CONST.BATCH_SIZE, validation_split=CONST.VALIDATION_SPLIT, callbacks=callbacks, initial_epoch=initialEpoch)
+
+	trainingModel.save(CONST.MODEL_PATH + "AttLSTMTrained.h5")
+
+	return trainingModel, samplingModels
+
+
+def main():
+	trainingModel, _ = trainModel()
 
 if __name__ == "__main__":
 	main()

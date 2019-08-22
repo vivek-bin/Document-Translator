@@ -276,42 +276,6 @@ def encodeChars(data,encodingName):
 	return encodedData
 
 
-def loadEncodedData(fileName):
-	data = np.load(CONST.PROCESSED_DATA + fileName + ".npz")
-	wordData = data["encoded"]
-	charForwardData = data["charForwardEncoded"]
-	charBackwardData = data["charBackwardEncoded"]
-	data = None
-
-	wordData = wordData[:CONST.DATA_COUNT].copy()
-	charForwardData = charForwardData[:CONST.DATA_COUNT].copy()
-	charBackwardData = charBackwardData[:CONST.DATA_COUNT].copy()
-
-	charData = np.concatenate((charForwardData, charBackwardData), axis=2)
-
-	shape = charData.shape
-	charData = np.reshape(charData, (shape[0], shape[1] * shape[2]))
-
-	return wordData, charData
-	
-
-def getFrToEngData():
-	fr = loadEncodedData("frEncodedData")
-	en = loadEncodedData("enEncodedData")
-
-	inputData = fr + en
-	outputData = en[0]
-	outputData = np.pad(outputData,((0,0),(0,1)), mode='constant')[:,1:]
-	outputData = [np.expand_dims(outputData,axis=-1)]					#for sparse categorical
-
-	trainIn = [x[:CONST.TRAIN_SPLIT] for x in inputData]
-	testIn = [x[CONST.TRAIN_SPLIT:] for x in inputData]
-	
-	trainOut = [x[:CONST.TRAIN_SPLIT] for x in outputData]
-	testOut = [x[CONST.TRAIN_SPLIT:] for x in outputData]
-
-	return (trainIn, trainOut), (testIn, testOut)
-
 def main():
 	writeEncodingsData()
 
