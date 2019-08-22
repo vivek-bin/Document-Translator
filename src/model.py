@@ -2,7 +2,7 @@ import numpy as np
 from keras.models import load_model
 from keras.models import Model
 from keras import layers
-from keras.optimizers import RMSprop
+from keras.optimizers import Adam
 import json
 import keras.backend as K
 from keras.callbacks import ModelCheckpoint
@@ -213,7 +213,7 @@ def getLastCheckpoint():
 def trainModel():
 	#get model
 	trainingModel, samplingModels = translationLSTMAttModel()
-	trainingModel.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["sparse_categorical_accuracy"])
+	trainingModel.compile(optimizer=Adam(lr=0.008, decay=0.2), loss="sparse_categorical_crossentropy", metrics=["sparse_categorical_accuracy"])
 	trainingModel.summary()
 
 	initialEpoch = 0
