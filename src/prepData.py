@@ -46,7 +46,6 @@ def cleanData(fr, en):
 def cleanText(lines):
 	linesOut = []
 	for line in lines:
-		line = line.lower().replace("’","'")
 		lineOut = cleanLine(line)
 		linesOut.append(lineOut)
 		
@@ -54,6 +53,7 @@ def cleanText(lines):
 	
 
 def cleanLine(line):
+	line = line.lower().replace("’","'")
 	words = [w for s in re.findall(r'\b(?=\w*?\d)\w+(?:[\W_](?=\w*?\d)\w+)*|[^\W\d_]+|[\W_]', line) for w in re.findall(r'\s+|\S+',s)]
 	words = [word for word in words if word.strip()]
 
@@ -216,32 +216,27 @@ def charEncoding(data):
 	return encoding
 
 
-def saveEncodedData(data, dataName):
-	#create char level data for each word
-	charForward = [CONST.UNIT_SEP.join([word[:CONST.CHAR_INPUT_SIZE] for word in line.split(CONST.UNIT_SEP)]) for line in data]
-	charBackward = [CONST.UNIT_SEP.join([word[:-CONST.CHAR_INPUT_SIZE-1:-1] for word in line.split(CONST.UNIT_SEP)]) for line in data]
-
+def saveEncodedData(data, language):
 	#encoded data
-	encoded = encodeWords(data, dataName)
-	charForwardEncoded = encodeChars(charForward, dataName)
-	charBackwardEncoded = encodeChars(charBackward, dataName)
+	wordEncoded = encodeWords(data, language)
+	charForwardEncoded = encodeCharsForward(data, language)
+	charBackwardEncoded = encodeCharsBackward(data, language)
 
-	print("input text encoded words   : "+str(encoded.shape))
+	print("input text encoded words   : "+str(wordEncoded.shape))
 	print("input text encoded char(f) : "+str(charForwardEncoded.shape))
 	print("input text encoded char(b) : "+str(charBackwardEncoded.shape))
 	
-	np.savez_compressed(CONST.PROCESSED_DATA + dataName + "EncodedData", encoded=encoded, charForwardEncoded=charForwardEncoded, charBackwardEncoded=charBackwardEncoded)
+	np.savez_compressed(CONST.PROCESSED_DATA + language + "EncodedData", encoded=wordEncoded, charForwardEncoded=charForwardEncoded, charBackwardEncoded=charBackwardEncoded)
 
-	return encoded, charForwardEncoded, charBackwardEncoded
+	return wordEncoded, charForwardEncoded, charBackwardEncoded
 
 
 
-def encodeWords(data,encodingName):
+def encodeWords(data,language):
 	encodedData = np.zeros((len(data), CONST.INPUT_SEQUENCE_LENGTH),dtype="uint16")			#initialize zero array
 
-	with open(CONST.ENCODING_PATH+encodingName+"_word.json", "r") as f:
-		encoding = json.load(f)
-	encoding = {word:i for i,word in enumerate(encoding)}
+	with open(CONST.ENCODING_PATH+language+"_word.json", "r") as f:
+		encoding = {word:i for i,word in enumerate(json.load(f))}
 
 	for i,line in enumerate(data):
 		encodedData[i][0] = encoding[CONST.START_OF_SEQUENCE_TOKEN]
@@ -254,16 +249,23 @@ def encodeWords(data,encodingName):
 
 	return encodedData
 
+def encodeCharsForward(data,language):
+	data = [CONST.UNIT_SEP.join([word[:CONST.CHAR_INPUT_SIZE] for word in line.split(CONST.UNIT_SEP)]) for line in data]
+	encodedData = encodeChars(data, language)
+	
+	return encodedData
 
+def encodeCharsBackward(data,language):
+	data = [CONST.UNIT_SEP.join([word[:-CONST.CHAR_INPUT_SIZE-1:-1] for word in line.split(CONST.UNIT_SEP)]) for line in data]
+	encodedData = encodeChars(data, language)
+	
+	return encodedData
 
-def encodeChars(data,encodingName):
+def encodeChars(data,language):
 	encodedData = np.zeros((len(data), CONST.INPUT_SEQUENCE_LENGTH, CONST.CHAR_INPUT_SIZE),dtype="uint8")			#initialize zero array
 
-
-	with open(CONST.ENCODING_PATH+encodingName+"_char.json", "r") as f:
-		encoding = json.load(f)
-	encoding = {ch:i for i,ch in enumerate(encoding)}
-
+	with open(CONST.ENCODING_PATH+language+"_char.json", "r") as f:
+		encoding = {ch:i for i,ch in enumerate(json.load(f))}
 
 	for i,line in enumerate(data):
 		for j,word in enumerate(line.split(CONST.UNIT_SEP)):

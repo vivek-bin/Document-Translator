@@ -23,9 +23,7 @@ def loadEncodedData(fileName):
 	charBackwardData = charBackwardData[:CONST.DATA_COUNT].copy()
 
 	charData = np.concatenate((charForwardData, charBackwardData), axis=2)
-
-	shape = charData.shape
-	charData = np.reshape(charData, (shape[0], shape[1] * shape[2]))
+	charData = np.reshape(charData, (charData.shape[0], -1))
 
 	return wordData, charData
 	
@@ -76,10 +74,10 @@ def translationLSTMAttModel():
 	decoderEmbedding = decoderEmbedding_SHARED([decoderWordInput, decoderCharInput])
 
 	######ENCODER PROCESSING STAGE
-	encoderOut_SHARED = layers.Bidirectional(layers.LSTM(CONST.NUM_LSTM_UNITS, return_sequences=True, return_state=True))
+	encoderOut_SHARED = layers.Bidirectional(layers.LSTM(CONST.NUM_LSTM_UNITS, return_sequences=True, return_state=True, activation=CONST.LSTM_ACTIVATION))
 	encoderOut, encoderForwardH, encoderForwardC, _, _ = encoderOut_SHARED(encoderEmbedding)
 	######DECODER PROCESSING STAGE
-	decoderOut_SHARED = layers.LSTM(CONST.NUM_LSTM_UNITS, return_state=True, return_sequences=True)
+	decoderOut_SHARED = layers.LSTM(CONST.NUM_LSTM_UNITS, return_state=True, return_sequences=True, activation=CONST.LSTM_ACTIVATION)
 	decoderOut, decoderH, decoderC = decoderOut_SHARED(decoderEmbedding, initial_state=[encoderForwardH, encoderForwardC])
 
 	######ATTENTION STAGE
@@ -99,7 +97,7 @@ def translationLSTMAttModel():
 	################################
 	###########
 	#first step prediction model
-	samplingModelInit = Model(inputs=[encoderWordInput, encoderCharInput, decoderWordInput, decoderCharInput], outputs=[wordOut, encoderOut,  decoderH, decoderC, alphas])
+	samplingModelInit = Model(inputs=[encoderWordInput, encoderCharInput, decoderWordInput, decoderCharInput], outputs=[wordOut, encoderOut, decoderH, decoderC, alphas])
 
 	###########
 	#next steps prediction model
@@ -143,8 +141,8 @@ def attentionStage():
 	encoderOutNorm = layers.TimeDistributed(layers.BatchNormalization())(encoderOutNorm)
 	decoderOutNorm = layers.TimeDistributed(layers.BatchNormalization())(decoderOutNorm)
 	#key query pair
-	decoderAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS))(decoderOutNorm)
-	encoderAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS))(encoderOutNorm)
+	decoderAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS, activation=CONST.DENSE_ACTIVATION))(decoderOutNorm)
+	encoderAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS, activation=CONST.DENSE_ACTIVATION))(encoderOutNorm)
 	
 	#generate alphas
 	alphas = layers.dot([decoderAttentionIn, encoderAttentionIn],axes=2)
@@ -168,14 +166,14 @@ def outputStage(OUTPUT_VOCABULARY_COUNT):
 	contextOutNorm = layers.TimeDistributed(layers.BatchNormalization())(contextOutNorm)
 	decoderOutNorm = layers.TimeDistributed(layers.BatchNormalization())(decoderOutNorm)
 	#prepare different inputs for prediction
-	decoderOutFinal = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE))(decoderOutNorm)
-	contextFinal = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE))(contextOutNorm)
-	prevWordFinal = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE))(decoderEmbedding)
+	decoderOutFinal = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE, activation=CONST.DENSE_ACTIVATION))(decoderOutNorm)
+	contextFinal = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE, activation=CONST.DENSE_ACTIVATION))(contextOutNorm)
+	prevWordFinal = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE, activation=CONST.DENSE_ACTIVATION))(decoderEmbedding)
 
 	#combine
 	wordOut = layers.Add()([contextFinal, decoderOutFinal, prevWordFinal])
 	wordOut = layers.TimeDistributed(layers.BatchNormalization())(wordOut)
-	wordOut = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE))(wordOut)
+	wordOut = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE, activation=CONST.DENSE_ACTIVATION))(wordOut)
 	wordOut = layers.TimeDistributed(layers.BatchNormalization())(wordOut)
 
 	#word prediction
@@ -204,20 +202,18 @@ def evaluateModel(model, xTest, yTest):
 
 
 def getLastCheckpoint():
-	m = [fileName for fileName in os.listdir(CONST.MODEL_PATH) if fileName.startswith(CONST.MODEL_CHECKPOINT_NAME_START) and fileName.endswith(CONST.MODEL_CHECKPOINT_NAME_END)]
-	if m:
-		return sorted(m)[-1]
-	else:
-		return False
+	m = [x for x in os.listdir(CONST.MODEL_PATH) if x.startswith(CONST.MODEL_CHECKPOINT_NAME_START) and x.endswith(CONST.MODEL_CHECKPOINT_NAME_END)]
+	
+	return sorted(m)[-1] if m else False
 
-def trainModel():
+
+def loadModel():
 	#get model
 	trainingModel, samplingModels = translationLSTMAttModel()
-	trainingModel.compile(optimizer=Adam(lr=0.008, decay=0.2), loss="sparse_categorical_crossentropy", metrics=["sparse_categorical_accuracy"])
+	trainingModel.compile(optimizer=Adam(lr=CONST.LEARNING_RATE, decay=CONST.LEARNING_RATE_DECAY), loss=CONST.LOSS_FUNCTION, metrics=[CONST.EVALUATION_METRIC])
 	trainingModel.summary()
 
-	initialEpoch = 0
-	#load from checkpoint if provided
+	#load checkpoint if available
 	checkPointName = getLastCheckpoint()
 	if checkPointName:
 		trainingModel.load_weights(CONST.MODEL_PATH + checkPointName)
@@ -226,25 +222,29 @@ def trainModel():
 		weight_values = K.batch_get_value(getattr(tempModel.optimizer, 'weights'))
 		trainingModel.optimizer.set_weights(weight_values)
 
-		initialEpoch = int(checkPointName[len(CONST.MODEL_CHECKPOINT_NAME_START):][:4])
-
-
-	# load all data
-	(xTrain, yTrain), (_, _) = getFrToEngData()
-
-
-	# start training
-	callbacks = []
-	callbacks.append(ModelCheckpoint(CONST.MODEL_PATH + CONST.MODEL_CHECKPOINT_NAME, monitor='sparse_categorical_accuracy', mode='max',save_best_only=True))
-	_ = trainingModel.fit(x=xTrain, y=yTrain, epochs=CONST.NUM_EPOCHS, batch_size=CONST.BATCH_SIZE, validation_split=CONST.VALIDATION_SPLIT, callbacks=callbacks, initial_epoch=initialEpoch)
-
-	trainingModel.save(CONST.MODEL_PATH + "AttLSTMTrained.h5")
 
 	return trainingModel, samplingModels
 
 
+def trainModel():
+	#get model
+	trainingModel, _ = loadModel()
+
+	# load all data
+	(xTrain, yTrain), (_, _) = getFrToEngData()
+
+	# start training
+	initialEpoch = int(getLastCheckpoint()[len(CONST.MODEL_CHECKPOINT_NAME_START):][:4]) if getLastCheckpoint() else 0
+	callbacks = []
+	callbacks.append(ModelCheckpoint(CONST.MODEL_PATH + CONST.MODEL_CHECKPOINT_NAME, monitor=CONST.EVALUATION_METRIC, mode='max',save_best_only=True))
+	_ = trainingModel.fit(x=xTrain, y=yTrain, epochs=CONST.NUM_EPOCHS, batch_size=CONST.BATCH_SIZE, validation_split=CONST.VALIDATION_SPLIT, callbacks=callbacks, initial_epoch=initialEpoch)
+
+	trainingModel.save(CONST.MODEL_PATH + "AttLSTMTrained.h5")
+
+
+
 def main():
-	trainingModel, _ = trainModel()
+	trainModel()
 
 if __name__ == "__main__":
 	main()
