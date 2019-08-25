@@ -233,7 +233,8 @@ def saveEncodedData(data, language):
 
 
 def encodeWords(data,language):
-	encodedData = np.zeros((len(data), CONST.INPUT_SEQUENCE_LENGTH),dtype="uint16")			#initialize zero array
+	maxSequenceLenth = max([len(line.split(CONST.UNIT_SEP)) for line in data]) + 2		#start and end of sequence
+	encodedData = np.zeros((len(data), maxSequenceLenth),dtype="uint16")			#initialize zero array
 
 	with open(CONST.ENCODING_PATH+language+"_word.json", "r") as f:
 		encoding = {word:i for i,word in enumerate(json.load(f))}
@@ -262,7 +263,8 @@ def encodeCharsBackward(data,language):
 	return encodedData
 
 def encodeChars(data,language):
-	encodedData = np.zeros((len(data), CONST.INPUT_SEQUENCE_LENGTH, CONST.CHAR_INPUT_SIZE),dtype="uint8")			#initialize zero array
+	maxSequenceLenth = max([len(line.split(CONST.UNIT_SEP)) for line in data]) + 2		#start and end of sequence
+	encodedData = np.zeros((len(data), maxSequenceLenth, CONST.CHAR_INPUT_SIZE),dtype="uint8")			#initialize zero array
 
 	with open(CONST.ENCODING_PATH+language+"_char.json", "r") as f:
 		encoding = {ch:i for i,ch in enumerate(json.load(f))}

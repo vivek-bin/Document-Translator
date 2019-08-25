@@ -145,7 +145,8 @@ def attentionStage():
 	encoderAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS, activation=CONST.DENSE_ACTIVATION))(encoderOutNorm)
 	
 	#generate alphas
-	alphas = layers.dot([decoderAttentionIn, encoderAttentionIn],axes=2)
+	alphas = layers.dot([decoderAttentionIn, encoderAttentionIn], axes=2)
+	alphas = layers.Lambda(lambda x: x/K.sqrt(K.cast(CONST.ATTENTION_UNITS, K.floatx())))(alphas)
 	alphas = layers.TimeDistributed(layers.Activation("softmax"))(alphas)
 
 	#create weighted encoder context
