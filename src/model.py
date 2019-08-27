@@ -78,11 +78,11 @@ def translationLSTMAttModel():
 	encoderOut, encoderForwardH, encoderForwardC, _, _ = encoderOut_SHARED(encoderEmbedding)
 	######DECODER PROCESSING STAGE
 	decoderOut_SHARED = layers.LSTM(CONST.NUM_LSTM_UNITS, return_state=True, return_sequences=True, activation=CONST.LSTM_ACTIVATION)
-	decoderOut, decoderH, decoderC = decoderOut_SHARED(decoderEmbedding, initial_state=[encoderForwardH, encoderForwardC])
+	decoderOut, decoderH, decoderC = decoderOut_SHARED([decoderEmbedding, encoderForwardH, encoderForwardC])
 
 	######ATTENTION STAGE
-	attentionLayer_SHARED = attentionStage()
-	[contextOut, alphas] = attentionLayer_SHARED([encoderOut, decoderOut])
+	attentionLayer_SHARED = multiHeadAttentionStage(CONST.NUM_ATTENTION_HEADS)
+	[contextOut, alphas] = attentionLayer_SHARED([decoderOut, encoderOut])
 	
 	######FINAL PREDICTION STAGE
 	outputStage_SHARED = outputStage(OUTPUT_VOCABULARY_COUNT)
@@ -105,8 +105,8 @@ def translationLSTMAttModel():
 	previousDecoderH = layers.Input(batch_shape=(None, None, CONST.NUM_LSTM_UNITS))
 	previousDecoderC = layers.Input(batch_shape=(None, None, CONST.NUM_LSTM_UNITS))
 
-	decoderOut, decoderH, decoderC = decoderOut_SHARED(decoderEmbedding, initial_state=[previousDecoderH, previousDecoderC])
-	[contextOut, alphas] = attentionLayer_SHARED([preprocessedEncoder, decoderOut])
+	decoderOut, decoderH, decoderC = decoderOut_SHARED([decoderEmbedding, previousDecoderH, previousDecoderC])
+	[contextOut, alphas] = attentionLayer_SHARED([decoderOut, preprocessedEncoder])
 	wordOut = outputStage_SHARED([contextOut, decoderOut, decoderEmbedding])
 	
 	samplingModelNext = Model(inputs=[preprocessedEncoder, previousDecoderH, previousDecoderC, decoderWordInput, decoderCharInput], outputs=[wordOut, preprocessedEncoder, decoderH, decoderC, alphas])
@@ -133,35 +133,89 @@ def embeddingStage(VOCABULARY_COUNT, CHAR_VOCABULARY_COUNT):
 
 
 def attentionStage():
-	encoderOut = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS*2))
-	decoderOut = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS))
+	query = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS))
+	key = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS*2))
 
-	encoderOutNorm = encoderOut
-	decoderOutNorm = decoderOut
-	encoderOutNorm = layers.TimeDistributed(layers.BatchNormalization())(encoderOutNorm)
-	decoderOutNorm = layers.TimeDistributed(layers.BatchNormalization())(decoderOutNorm)
-	#key query pair
-	decoderAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS, activation=CONST.DENSE_ACTIVATION))(decoderOutNorm)
-	encoderAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS, activation=CONST.DENSE_ACTIVATION))(encoderOutNorm)
+	queryNorm = query
+	keyNorm = key
+	queryNorm = layers.TimeDistributed(layers.BatchNormalization())(queryNorm)
+	keyNorm = layers.TimeDistributed(layers.BatchNormalization())(keyNorm)
+
+	def sqrtScaleValues(x):
+		import constants as CONST
+		import math
+		return x/math.sqrt(float(CONST.ATTENTION_UNITS))
+
 	
+	#key query pair
+	queryAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS, activation=CONST.DENSE_ACTIVATION))(queryNorm)
+	keyAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS, activation=CONST.DENSE_ACTIVATION))(keyNorm)
+	
+
 	#generate alphas
-	scale = K.sqrt(K.cast(CONST.ATTENTION_UNITS, K.floatx()))
-	alphas = layers.dot([decoderAttentionIn, encoderAttentionIn], axes=2)
-	alphas = layers.Lambda(lambda x: x/scale)(alphas)
+	alphas = layers.dot([queryAttentionIn, keyAttentionIn], axes=2)
+	alphas = layers.Lambda(sqrtScaleValues)(alphas)
 	alphas = layers.TimeDistributed(layers.Activation("softmax"))(alphas)
 
 	#create weighted encoder context
-	permEncoderOut = layers.Permute((2,1))(encoderOutNorm)
-	contextOut = layers.dot([alphas, permEncoderOut], axes=2)
+	permKeyNorm = layers.Permute((2,1))(keyNorm)
+	contextOut = layers.dot([alphas, permKeyNorm], axes=2)
 
-	attentionModel = Model(inputs=[encoderOut, decoderOut], outputs=[contextOut, alphas], name="attention")
+	attentionModel = Model(inputs=[query, key], outputs=[contextOut, alphas], name="attention")
+	return attentionModel
+
+
+def multiHeadAttentionStage(h):
+	query = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS))
+	key = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS*2))
+
+	queryNorm = query
+	keyNorm = key
+	queryNorm = layers.TimeDistributed(layers.BatchNormalization())(queryNorm)
+	keyNorm = layers.TimeDistributed(layers.BatchNormalization())(keyNorm)
+
+	# sqrtScale = K.sqrt(K.cast(CONST.ATTENTION_UNITS//h, K.floatx()))
+	def sqrtScaleValues(x):
+		import constants as CONST
+		import math
+		return x/math.sqrt(float(CONST.ATTENTION_UNITS//h))
+
+	contextList = []
+	alphasList = []
+
+	for _ in range(h):
+		#key query pair
+		queryAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS//h, activation=CONST.DENSE_ACTIVATION))(queryNorm)
+		keyAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS//h, activation=CONST.DENSE_ACTIVATION))(keyNorm)
+		valueAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS//h, activation=CONST.DENSE_ACTIVATION))(keyNorm)
+		
+		#generate alphas
+		alphas = layers.dot([queryAttentionIn, keyAttentionIn], axes=2)
+		alphas = layers.Lambda(sqrtScaleValues)(alphas)
+		alphas = layers.TimeDistributed(layers.Activation("softmax"))(alphas)
+
+		#create weighted encoder context
+		permValueAttentionIn = layers.Permute((2,1))(valueAttentionIn)
+		contextOut = layers.dot([alphas, permValueAttentionIn], axes=2)
+
+		alphasList.append(alphas)
+		contextList.append(contextOut)
+	
+	alphas = layers.Average()(alphasList)
+
+	contextOut = layers.Concatenate()(contextList)
+	contextOut = layers.TimeDistributed(layers.BatchNormalization())(contextOut)
+	contextOut = layers.TimeDistributed(layers.Dense(int(query.shape[-1]), activation=CONST.DENSE_ACTIVATION))(contextOut)
+	contextOut = layers.Add()([queryNorm, contextOut])
+
+	attentionModel = Model(inputs=[query, key], outputs=[contextOut, alphas], name="multi_attention")
 	return attentionModel
 
 
 def outputStage(OUTPUT_VOCABULARY_COUNT):
 	decoderEmbedding = layers.Input(batch_shape=(None,None,CONST.WORD_EMBEDDING_SIZE + CONST.CHAR_EMBEDDING_SIZE*CONST.CHAR_INPUT_SIZE*2))
 	decoderOut = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS))
-	contextOut = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS*2))
+	contextOut = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS))
 
 	contextOutNorm = contextOut
 	decoderOutNorm = decoderOut
@@ -219,6 +273,9 @@ def loadModel():
 	checkPointName = getLastCheckpoint()
 	if checkPointName:
 		trainingModel.load_weights(CONST.MODEL_PATH + checkPointName)
+		samplingModels[0].load_weights(CONST.MODEL_PATH + checkPointName)
+		samplingModels[1].load_weights(CONST.MODEL_PATH + checkPointName, by_name=True)
+
 		tempModel = load_model(CONST.MODEL_PATH + checkPointName)
 		trainingModel._make_train_function()
 		weight_values = K.batch_get_value(getattr(tempModel.optimizer, 'weights'))
