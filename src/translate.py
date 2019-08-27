@@ -68,7 +68,7 @@ def translate(inputStrings, startLang="fr", endLang="en"):
 
 
 	# prepare input sentence
-	cleanData = PD.cleanText(inputStrings)
+	cleanData = PD.cleanText(inputStrings, startLang)
 	wordData, charData = encoderEncodeData(cleanData, startLang)
 	
 	# prepare decoder input

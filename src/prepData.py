@@ -7,6 +7,12 @@ import re
 import json
 import numpy as np
 from random import shuffle
+from nltk.stem import SnowballStemmer
+from os.path import commonprefix
+
+STEMMER = {}
+STEMMER["en"] = SnowballStemmer("english")
+STEMMER["fr"] = SnowballStemmer("french")
 
 
 def readData():
@@ -33,8 +39,8 @@ def readData():
 
 
 def cleanData(fr, en):
-	fr = cleanText(fr)
-	en = cleanText(en)
+	fr = cleanText(fr, "fr")
+	en = cleanText(en, "en")
 
 	print("text clean finished")
 
@@ -43,19 +49,30 @@ def cleanData(fr, en):
 	return fr, en
 
 
-def cleanText(lines):
+def cleanText(lines, language):
 	linesOut = []
 	for line in lines:
-		lineOut = cleanLine(line)
+		lineOut = cleanLine(line, language)
 		linesOut.append(lineOut)
 		
 	return linesOut
 	
 
-def cleanLine(line):
+def cleanLine(line, language):
+	global STEMMER
+	stemmer = STEMMER[language].stem
 	line = line.lower().replace("’","'")
 	words = [w for s in re.findall(r'\b(?=\w*?\d)\w+(?:[\W_](?=\w*?\d)\w+)*|[^\W\d_]+|[\W_]', line) for w in re.findall(r'\s+|\S+',s)]
-	words = [word for word in words if word.strip()]
+	
+	def splitWord(word):
+		wordStem = stemmer(word)
+		if word == wordStem:
+			return [word]
+		else:
+			wordTrail = word[len(commonprefix([wordStem, word])):]
+			return [wordStem, CONST.WORD_STEM_TRAIL_IDENTIFIER+wordTrail]
+
+	words = [wordPart for word in words if word.strip() for wordPart in splitWord(word)]
 
 	return CONST.UNIT_SEP.join(words)
 	

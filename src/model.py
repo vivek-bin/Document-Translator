@@ -195,8 +195,8 @@ def multiHeadAttentionStage(h):
 		alphas = layers.TimeDistributed(layers.Activation("softmax"))(alphas)
 
 		#create weighted encoder context
-		permValueAttentionIn = layers.Permute((2,1))(valueAttentionIn)
-		contextOut = layers.dot([alphas, permValueAttentionIn], axes=2)
+		valueAttentionIn = layers.Permute((2,1))(valueAttentionIn)
+		contextOut = layers.dot([alphas, valueAttentionIn], axes=2)
 
 		alphasList.append(alphas)
 		contextList.append(contextOut)
@@ -221,7 +221,8 @@ def outputStage(OUTPUT_VOCABULARY_COUNT):
 	decoderOutNorm = decoderOut
 	contextOutNorm = layers.TimeDistributed(layers.BatchNormalization())(contextOutNorm)
 	decoderOutNorm = layers.TimeDistributed(layers.BatchNormalization())(decoderOutNorm)
-	#prepare different inputs for prediction
+	
+	
 	decoderOutFinal = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE, activation=CONST.DENSE_ACTIVATION))(decoderOutNorm)
 	contextFinal = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE, activation=CONST.DENSE_ACTIVATION))(contextOutNorm)
 	prevWordFinal = layers.TimeDistributed(layers.Dense(CONST.WORD_EMBEDDING_SIZE, activation=CONST.DENSE_ACTIVATION))(decoderEmbedding)
