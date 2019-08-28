@@ -5,17 +5,17 @@ from .. import constants as CONST
 
 
 
-def embeddingStage(VOCABULARY_COUNT):
+def embeddingStage(VOCABULARY_COUNT, name):
 	#word embedding
 	wordInput = layers.Input(batch_shape=(None, None))
 	embedding = layers.Embedding(input_dim=VOCABULARY_COUNT, output_dim=CONST.WORD_EMBEDDING_SIZE)(wordInput)
 	embedding = layers.TimeDistributed(layers.BatchNormalization())(embedding)
 
-	embeddingModel = Model(inputs=[wordInput], outputs=[embedding])
+	embeddingModel = Model(inputs=[wordInput], outputs=[embedding], name="embedding_"+name)
 	return embeddingModel
 
 
-def wordCharEmbeddingStage(VOCABULARY_COUNT, CHAR_VOCABULARY_COUNT):
+def wordCharEmbeddingStage(VOCABULARY_COUNT, CHAR_VOCABULARY_COUNT, name):
 	#word embedding
 	wordInput = layers.Input(batch_shape=(None, None))
 	wordEmbedding = layers.Embedding(input_dim=VOCABULARY_COUNT, output_dim=CONST.WORD_EMBEDDING_SIZE)(wordInput)
@@ -27,6 +27,6 @@ def wordCharEmbeddingStage(VOCABULARY_COUNT, CHAR_VOCABULARY_COUNT):
 	embedding = layers.concatenate([wordEmbedding, charEmbedding])
 	embedding = layers.TimeDistributed(layers.BatchNormalization())(embedding)
 
-	embeddingModel = Model(inputs=[wordInput, charInput], outputs=[embedding])
+	embeddingModel = Model(inputs=[wordInput, charInput], outputs=[embedding], name="embedding_"+name)
 	return embeddingModel
 

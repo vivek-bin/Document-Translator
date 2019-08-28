@@ -2,6 +2,11 @@ from inspect import getsourcefile
 from os.path import abspath
 from os.path import dirname
 from os.path import isdir
+from time import time
+
+START_TIME = time()
+def LAPSED_TIME():
+	return "{:10.2f} seconds".format((time() - START_TIME)).rjust(60,"-")
 
 #paths
 GOOGLE_DRIVE_PATH = "/content/drive/My Drive/"
@@ -13,7 +18,7 @@ else:
 	PROJECT = dirname(dirname(abspath(getsourcefile(lambda:0)))) + "/"
 
 
-MODEL_PATH = PROJECT + "models/"
+MODEL_PATH = PATH + "models/"
 ENCODING_PATH = PROJECT + "encodings/"
 
 
@@ -39,19 +44,21 @@ HANSARDS_SENATE_TEST = HANSARDS_SENATE + "testing/"
 PROCESSED_DATA = DATA + "processed input/"
 
 
-DATA_COUNT = int(0.5 * 1000 * 1000)
+DATA_COUNT = int(0.05 * 1000 * 1000)
 
 UNIT_SEP = "\x1f"
 MASK_TOKEN = "MASK"
 UNKNOWN_TOKEN = "UNK"
 START_OF_SEQUENCE_TOKEN = "SOS"
 END_OF_SEQUENCE_TOKEN = "EOS"
-WORD_STEM_TRAIL_IDENTIFIER = "###"
+WORD_STEM_TRAIL_IDENTIFIER = "##"
 
-MIN_CHAR_COUNT = 30
+RARE_CHAR_COUNT = 30
+
+
+MIN_CHAR_COUNT = 50
 MIN_WORD_COUNT = 20
 CHAR_INPUT_SIZE = 4
-
 
 LSTM_ACTIVATION = "tanh"
 DENSE_ACTIVATION = "relu"

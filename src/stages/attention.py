@@ -4,19 +4,28 @@ from keras import layers
 from .. import constants as CONST
 
 
-def dotAttention(count=0):
+def dotAttention(count=0, hideFuture=False):
 	query = layers.Input(batch_shape=(None,None,None))
 	key = layers.Input(batch_shape=(None,None,None))
 	value = layers.Input(batch_shape=(None,None,None))
 
 	def sqrtScaleValues(x):
 		from .. import constants as CONST
-		import math
-		return x/math.sqrt(float(CONST.ATTENTION_UNITS))
-	
+		from keras import backend as K
+		xScaled = x/K.sqrt(K.cast(CONST.ATTENTION_UNITS, "float32"))
+		return xScaled
+
+	def sqrtScaleHideFuture(x):
+		from .. import constants as CONST
+		from keras import backend as K
+		xScaled = x/K.sqrt(K.cast(CONST.ATTENTION_UNITS, "float32"))
+		xHidden = xScaled
+		
+		return xHidden
+
 	#generate alphas
 	alphas = layers.dot([query, key], axes=2)
-	alphas = layers.Lambda(sqrtScaleValues)(alphas)
+	alphas = layers.Lambda(sqrtScaleHideFuture if hideFuture else sqrtScaleValues)(alphas)
 	alphas = layers.TimeDistributed(layers.Activation("softmax"))(alphas)
 
 	#create weighted encoder context
@@ -47,7 +56,7 @@ def basicAttentionStage():
 	return attentionModel
 
 
-def multiHeadAttentionStage(h, count=0):
+def multiHeadAttentionStage(h, count=0, hideFuture=False):
 	query = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS))
 	key = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS))
 
@@ -66,7 +75,7 @@ def multiHeadAttentionStage(h, count=0):
 		valueAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS//h, activation=CONST.DENSE_ACTIVATION))(keyNorm)
 		
 		# attention!
-		[contextOut, alphas] = dotAttention(count=count*h+i)([queryAttentionIn, keyAttentionIn, valueAttentionIn])
+		[contextOut, alphas] = dotAttention(count=count*h+i, hideFuture=hideFuture)([queryAttentionIn, keyAttentionIn, valueAttentionIn])
 
 		alphasList.append(alphas)
 		contextList.append(contextOut)

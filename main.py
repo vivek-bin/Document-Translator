@@ -1,4 +1,5 @@
 import sys
+from src import constants as CONST
 
 VALID_FLAGS = ["--prep", "--train", "--translate"]
 
@@ -23,7 +24,7 @@ def main():
 			translateFlag = True
 
 	if prepareDataFlag:
-		from src.processing.preparedata import writeEncodingsData
+		from src.preparedata import writeEncodingsData
 		writeEncodingsData()
 
 	if trainModelFlag:

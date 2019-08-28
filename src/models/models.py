@@ -24,13 +24,13 @@ def translationLSTMAttModel():
 	######ENCODER EMBEDDING
 	encoderWordInput = layers.Input(batch_shape=(None, None))
 	encoderCharInput = layers.Input(batch_shape=(None, None))		# forward and backwards
-	encoderEmbedding_SHARED = wordCharEmbeddingStage(INPUT_VOCABULARY_COUNT, INPUT_CHAR_VOCABULARY_COUNT)
+	encoderEmbedding_SHARED = wordCharEmbeddingStage(INPUT_VOCABULARY_COUNT, INPUT_CHAR_VOCABULARY_COUNT, name="encoder")
 	encoderEmbedding = encoderEmbedding_SHARED([encoderWordInput, encoderCharInput])
 
 	######DECODER EMBEDDING
 	decoderWordInput = layers.Input(batch_shape=(None, None))
 	decoderCharInput = layers.Input(batch_shape=(None, None))		# forward and backwards
-	decoderEmbedding_SHARED = wordCharEmbeddingStage(OUTPUT_VOCABULARY_COUNT, OUTPUT_CHAR_VOCABULARY_COUNT)
+	decoderEmbedding_SHARED = wordCharEmbeddingStage(OUTPUT_VOCABULARY_COUNT, OUTPUT_CHAR_VOCABULARY_COUNT, name="decoder")
 	decoderEmbedding = decoderEmbedding_SHARED([decoderWordInput, decoderCharInput])
 
 	######ENCODER PROCESSING STAGE

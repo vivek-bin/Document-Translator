@@ -25,16 +25,15 @@ def saveModels(trainingModel, modelName, samplingModels=False):
 	
 	print("Saved model structure")
 	
-
 def evaluateModel(model, xTest, yTest):
 	scores = model.evaluate(xTest, yTest, verbose=0)
 	print("%s: %.2f%%" % (model.metrics_names[1], scores[1]*100))
 
 
 def getLastCheckpoint():
-	m = [x for x in os.listdir(CONST.MODEL_PATH) if x.startswith(CONST.MODEL_CHECKPOINT_NAME_START) and x.endswith(CONST.MODEL_CHECKPOINT_NAME_END)]
-	
-	return sorted(m)[-1] if m else False
+	c = os.listdir(CONST.MODEL_PATH)
+	c = [x for x in c if x.startswith(CONST.MODEL_CHECKPOINT_NAME_START) and x.endswith(CONST.MODEL_CHECKPOINT_NAME_END)]
+	return sorted(c)[-1] if c else False
 
 
 def loadModel():
@@ -58,8 +57,9 @@ def loadModel():
 
 	return trainingModel, samplingModels
 
-def loadEncodedData(fileName):
-	data = np.load(CONST.PROCESSED_DATA + fileName + ".npz")
+
+def loadEncodedData(language):
+	data = np.load(CONST.PROCESSED_DATA + language + "EncodedData.npz")
 	wordData = data["encoded"]
 	charForwardData = data["charForwardEncoded"]
 	charBackwardData = data["charBackwardEncoded"]
@@ -74,13 +74,12 @@ def loadEncodedData(fileName):
 
 	return wordData, charData
 	
+def getTrainingData(startLang, endLang):
+	inData = loadEncodedData(startLang)
+	outData = loadEncodedData(endLang)
 
-def getFrToEngData():
-	fr = loadEncodedData("frEncodedData")
-	en = loadEncodedData("enEncodedData")
-
-	inputData = fr + en
-	outputData = en[0]
+	inputData = inData + outData
+	outputData = outData[0]
 	outputData = np.pad(outputData,((0,0),(0,1)), mode='constant')[:,1:]
 	outputData = [np.expand_dims(outputData,axis=-1)]					#for sparse categorical
 
@@ -98,7 +97,7 @@ def trainModel():
 	trainingModel, _ = loadModel()
 
 	# load all data
-	(xTrain, yTrain), (_, _) = getFrToEngData()
+	(xTrain, yTrain), (_, _) = getTrainingData(startLang="fr", endLang="en")
 
 	# start training
 	initialEpoch = int(getLastCheckpoint()[len(CONST.MODEL_CHECKPOINT_NAME_START):][:4]) if getLastCheckpoint() else 0
@@ -106,7 +105,7 @@ def trainModel():
 	callbacks.append(ModelCheckpoint(CONST.MODEL_PATH + CONST.MODEL_CHECKPOINT_NAME, monitor=CONST.EVALUATION_METRIC, mode='max',save_best_only=True))
 	_ = trainingModel.fit(x=xTrain, y=yTrain, epochs=CONST.NUM_EPOCHS, batch_size=CONST.BATCH_SIZE, validation_split=CONST.VALIDATION_SPLIT, callbacks=callbacks, initial_epoch=initialEpoch)
 
-	trainingModel.save(CONST.MODEL_PATH + "AttLSTMTrained.h5")
+	trainingModel.save(CONST.MODEL_PATH + CONST.MODEL_CHECKPOINT_NAME_START + "9999" + CONST.MODEL_CHECKPOINT_NAME_END)
 
 
 

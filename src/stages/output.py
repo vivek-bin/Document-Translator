@@ -4,7 +4,7 @@ from keras import layers
 from .. import constants as CONST
 
 
-def outputStage(OUTPUT_VOCABULARY_COUNT):
+def outputStage(OUTPUT_VOCABULARY_COUNT, name=""):
 	decoderEmbedding = layers.Input(batch_shape=(None,None,CONST.WORD_EMBEDDING_SIZE + CONST.CHAR_EMBEDDING_SIZE*CONST.CHAR_INPUT_SIZE*2))
 	decoderOut = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS))
 	contextOut = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS))
@@ -28,5 +28,5 @@ def outputStage(OUTPUT_VOCABULARY_COUNT):
 	#word prediction
 	wordOut = layers.TimeDistributed(layers.Dense(OUTPUT_VOCABULARY_COUNT, activation="softmax"))(wordOut)
 
-	outputStage = Model(inputs=[contextOut, decoderOut, decoderEmbedding], outputs=[wordOut], name="output")
+	outputStage = Model(inputs=[contextOut, decoderOut, decoderEmbedding], outputs=[wordOut], name="output"+name)
 	return outputStage
