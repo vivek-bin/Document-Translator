@@ -1,9 +1,9 @@
 import json
 import numpy as np
 
-import constants as CONST
-from model import loadModel
-import prepData as PD
+from . import constants as CONST
+from .trainmodel import loadModel
+from .processing import preparedata as PD
 
 
 

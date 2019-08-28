@@ -1,3 +1,4 @@
+/.vscode/
 /models/*.h5
 /models/*.hdf5
 /venv/
