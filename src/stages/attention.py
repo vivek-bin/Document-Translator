@@ -12,16 +12,16 @@ def dotAttention(count=0, hideFuture=False):
 	def sqrtScaleValues(x):
 		from .. import constants as CONST
 		from keras import backend as K
-		xScaled = x/K.sqrt(K.cast(CONST.ATTENTION_UNITS, "float32"))
-		return xScaled
+		scale = K.sqrt(K.cast(CONST.ATTENTION_UNITS, "float32"))
+		return x/scale
 
 	def sqrtScaleHideFuture(x):
 		from .. import constants as CONST
 		from keras import backend as K
-		xScaled = x/K.sqrt(K.cast(CONST.ATTENTION_UNITS, "float32"))
-		xHidden = xScaled
-		
-		return xHidden
+		import numpy as np
+		scale = K.sqrt(K.cast(CONST.ATTENTION_UNITS, "float32"))
+		mask = K.variable(np.tril(np.ones_like(x)))
+		return (x * mask)/scale
 
 	#generate alphas
 	alphas = layers.dot([query, key], axes=2)
@@ -36,9 +36,9 @@ def dotAttention(count=0, hideFuture=False):
 	return attention
 
 
-def basicAttentionStage():
-	query = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS))
-	key = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS))
+def basicAttentionStage(inputSize=CONST.NUM_LSTM_UNITS):
+	query = layers.Input(batch_shape=(None,None,inputSize))
+	key = layers.Input(batch_shape=(None,None,inputSize))
 
 	queryNorm = query
 	keyNorm = key
@@ -56,9 +56,9 @@ def basicAttentionStage():
 	return attentionModel
 
 
-def multiHeadAttentionStage(h, count=0, hideFuture=False):
-	query = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS))
-	key = layers.Input(batch_shape=(None,None,CONST.NUM_LSTM_UNITS))
+def multiHeadAttentionStage(inputSize, h=CONST.NUM_ATTENTION_HEADS, count=0, hideFuture=False):
+	query = layers.Input(batch_shape=(None,None,inputSize))
+	key = layers.Input(batch_shape=(None,None,inputSize))
 
 	queryNorm = query
 	keyNorm = key
@@ -84,7 +84,7 @@ def multiHeadAttentionStage(h, count=0, hideFuture=False):
 
 	contextOut = layers.Concatenate()(contextList)
 	contextOut = layers.TimeDistributed(layers.BatchNormalization())(contextOut)
-	contextOut = layers.TimeDistributed(layers.Dense(int(query.shape[-1]), activation=CONST.DENSE_ACTIVATION))(contextOut)
+	contextOut = layers.TimeDistributed(layers.Dense(inputSize, activation=CONST.DENSE_ACTIVATION))(contextOut)
 	contextOut = layers.Add()([queryNorm, contextOut])
 
 	attentionModel = Model(inputs=[query, key], outputs=[contextOut, alphas], name="multihead_attention_stage_"+str(count))

@@ -92,5 +92,30 @@ def multiPartModel():
 	print(fmodel.layers[4].layers[1].name)
 	return fmodel
 	
+
+def positionEncodingSpeed():
+	from keras import backend as K
+	import numpy as np
+	scale = 1
+	batchSize = 256 // scale
+	sequenceLength = 1000 // scale
+	embeddingSize = 512 // scale
 	
-multiPartModel()
+	positionEncoding = np.array([[pos / np.power(10, 8. * i / embeddingSize) for i in range(embeddingSize)] for pos in range(sequenceLength)])
+	positionEncoding[:, 0::2] = np.sin(positionEncoding[:, 0::2])
+	positionEncoding[:, 1::2] = np.cos(positionEncoding[:, 1::2])
+
+	positionEncoding = K.expand_dims(K.variable(positionEncoding), 0)
+	positionEncoding = K.tile(positionEncoding, [batchSize,1,1])
+
+	return positionEncoding	
+		
+
+from keras import backend as K
+import numpy as np
+import time
+startTime = time.time()
+print("start")
+for _ in range(1):
+	(positionEncodingSpeed().shape)
+print(time.time() - startTime)

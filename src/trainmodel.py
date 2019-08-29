@@ -38,7 +38,8 @@ def getLastCheckpoint():
 
 def loadModel():
 	#get model
-	trainingModel, samplingModels = translationLSTMAttModel()
+	#trainingModel, samplingModels = translationLSTMAttModel()
+	trainingModel, samplingModels = translationTransformerModel()
 	trainingModel.compile(optimizer=Adam(lr=CONST.LEARNING_RATE, decay=CONST.LEARNING_RATE_DECAY), loss=CONST.LOSS_FUNCTION, metrics=[CONST.EVALUATION_METRIC])
 	trainingModel.summary()
 
