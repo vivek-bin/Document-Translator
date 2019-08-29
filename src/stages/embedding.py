@@ -40,7 +40,7 @@ def wordCharEmbeddingStage(VOCABULARY_COUNT, CHAR_VOCABULARY_COUNT, name, addPos
 	charEmbedding = layers.Embedding(input_dim=CHAR_VOCABULARY_COUNT, output_dim=CONST.CHAR_EMBEDDING_SIZE)(charInput)
 	charEmbedding = layers.Reshape(target_shape=(-1, CONST.CHAR_INPUT_SIZE * 2 * CONST.CHAR_EMBEDDING_SIZE))(charEmbedding)
 	#final input embedding
-	embedding = layers.concatenate([wordEmbedding, charEmbedding])
+	embedding = layers.Concatenate()([wordEmbedding, charEmbedding])
 
 	if addPositionalEmbedding:
 		positionEmbedding = layers.Lambda(positionalEncoding)(embedding)

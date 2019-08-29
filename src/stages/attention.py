@@ -18,19 +18,20 @@ def dotAttention(count=0, hideFuture=False):
 	def sqrtScaleHideFuture(x):
 		from .. import constants as CONST
 		from keras import backend as K
-		import numpy as np
+		from tensorflow.linalg import LinearOperatorLowerTriangular as tril
+
 		scale = K.sqrt(K.cast(CONST.ATTENTION_UNITS, "float32"))
-		mask = K.variable(np.tril(np.ones_like(x)))
+		mask = K.variable(tril(K.ones_like(x)))
 		return (x * mask)/scale
 
 	#generate alphas
-	alphas = layers.dot([query, key], axes=2)
+	alphas = layers.Dot(axes=2)([query, key])
 	alphas = layers.Lambda(sqrtScaleHideFuture if hideFuture else sqrtScaleValues)(alphas)
 	alphas = layers.TimeDistributed(layers.Activation("softmax"))(alphas)
 
 	#create weighted encoder context
 	valuePerm = layers.Permute((2,1))(value)
-	contextOut = layers.dot([alphas, valuePerm], axes=2)
+	contextOut = layers.Dot(axes=2)([alphas, valuePerm])
 
 	attention = Model(inputs=[query, key, value], outputs=[contextOut, alphas], name="attention_head_"+str(count))
 	return attention
