@@ -18,10 +18,15 @@ def dotAttention(count=0, hideFuture=False):
 	def sqrtScaleHideFuture(x):
 		from .. import constants as CONST
 		from keras import backend as K
-		from tensorflow.linalg import LinearOperatorLowerTriangular as tril
+	
+		m = K.arange(K.shape(x)[1])
+		m1 = K.tile(K.expand_dims(m, 0), [K.shape(x)[1], 1])
+		m2 = K.tile(K.expand_dims(m, 1), [1, K.shape(x)[1]])
+		mask = K.cast(K.greater_equal(m1, m2), "float32")
+		mask = K.tile(K.expand_dims(mask, 0), [K.shape(x)[0], 1, 1])
 
 		scale = K.sqrt(K.cast(CONST.ATTENTION_UNITS, "float32"))
-		mask = K.variable(tril(K.ones_like(x)))
+
 		return (x * mask)/scale
 
 	#generate alphas

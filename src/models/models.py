@@ -141,7 +141,7 @@ def translationTransformerModel():
 
 	###########
 	#next steps prediction model
-	preprocessedEncoder = layers.Input(batch_shape=(None, None, CONST.NUM_LSTM_UNITS))
+	preprocessedEncoder = layers.Input(batch_shape=(None, None, CONST.EMBEDDING_SIZE))
 
 	decoderContext = decoderEmbedding
 	alphasList = []

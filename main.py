@@ -11,15 +11,21 @@ def main():
 
 	if not flags:
 		trainModelFlag = True
+		modelNum = 1
 	else:
 		for flag in flags:
-			if flag not in VALID_FLAGS:
+			if flag not in VALID_FLAGS and flag not in ["1","2"]:
 				print("Invalid flag. Valid flags are "+", ".join(VALID_FLAGS))
 				return False
 		if "--prep" in flags:
 			prepareDataFlag = True
 		if "--train" in flags:
 			trainModelFlag = True
+			try:
+				modelNum = int(flags[flags.index("--train")+1])
+			except (ValueError, IndexError):
+				modelNum = 1
+			
 		if "--translate" in flags:
 			translateFlag = True
 
@@ -29,7 +35,7 @@ def main():
 
 	if trainModelFlag:
 		from src.trainmodel import trainModel
-		trainModel()
+		trainModel(modelNum)
 
 	if translateFlag:
 		from src.translate import translate

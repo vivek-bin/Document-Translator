@@ -36,10 +36,12 @@ def getLastCheckpoint():
 	return sorted(c)[-1] if c else False
 
 
-def loadModel():
+def loadModel(modelNum):
 	#get model
-	#trainingModel, samplingModels = translationLSTMAttModel()
-	trainingModel, samplingModels = translationTransformerModel()
+	if modelNum == 1:
+		trainingModel, samplingModels = translationLSTMAttModel()
+	else:
+		trainingModel, samplingModels = translationTransformerModel()
 	trainingModel.compile(optimizer=Adam(lr=CONST.LEARNING_RATE, decay=CONST.LEARNING_RATE_DECAY), loss=CONST.LOSS_FUNCTION, metrics=[CONST.EVALUATION_METRIC])
 	trainingModel.summary()
 
@@ -93,9 +95,9 @@ def getTrainingData(startLang, endLang):
 	return (trainIn, trainOut), (testIn, testOut)
 
 
-def trainModel():
+def trainModel(modelNum):
 	#get model
-	trainingModel, _ = loadModel()
+	trainingModel, _ = loadModel(modelNum)
 
 	# load all data
 	(xTrain, yTrain), (_, _) = getTrainingData(startLang="fr", endLang="en")

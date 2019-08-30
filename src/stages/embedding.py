@@ -9,12 +9,10 @@ def positionalEncoding(x):
 	from keras import backend as K
 	from .. import constants as CONST
 	
-	sequenceLength = CONST.MAX_WORDS + 2 #int(x.shape[1])
-	batchSize = CONST.BATCH_SIZE #int(x.shape[0])
-	
-	positionEncoding = CONST.MAX_POSITIONAL_EMBEDDING[None,:sequenceLength]
-	return K.tile(K.variable(positionEncoding), [batchSize,1,1])
-
+	positionEncoding = K.variable(CONST.MAX_POSITIONAL_EMBEDDING)[0:K.shape(x)[1], 0:CONST.EMBEDDING_SIZE]
+	positionEncoding = K.tile(K.expand_dims(positionEncoding, 0), [K.shape(x)[0],1,1])
+	positionEncoding = K.reshape(x,(K.shape(x)[0], K.shape(x)[1], CONST.EMBEDDING_SIZE))
+	return positionEncoding
 
 
 def embeddingStage(VOCABULARY_COUNT, name, addPositionalEmbedding=False):
