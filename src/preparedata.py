@@ -16,27 +16,29 @@ STEMMER["fr"] = SnowballStemmer("french").stem
 
 #reading and cleaning the data
 def readData():
-	epFr, epEn = FA.loadEuroParl()
-	hFr, hEn = FA.loadHansards()
-	fr = epFr + hFr
-	en = epEn + hEn
+	epFr, epEn = FA.loadStandard(CONST.EUROPARL)
+	ccFr, ccEn = FA.loadStandard(CONST.COMMON_CRAWL)
+	haFr, haEn = FA.loadHansards()
+	feFr, feEn = FA.loadFraEng()
+	fr = epFr + haFr + feFr + ccFr
+	en = epEn + haEn + feEn + ccEn
 
 	frEn = list(zip(fr,en))
 	shuffle(frEn)
 	fr = [frLine for frLine, enLine in frEn]
 	en = [enLine for frLine, enLine in frEn]
 	
+	print("text read from disk")
+	print(CONST.LAPSED_TIME())
 	return fr, en
 
 def cleanText(lines, language):
 	assert type(lines) is list
 
-	linesOut = []
-	for line in lines:
-		lineOut = cleanLine(line, language)
-		linesOut.append(lineOut)
+	for i, line in enumerate(lines):
+		lines[i] = cleanLine(line, language)
 		
-	return linesOut
+	return lines
 
 def cleanLine(line, language):
 	line = line.lower().replace("’","'")
@@ -111,8 +113,6 @@ def getWordFrequencies(file):
 # write encodings and encoded data to disk
 def writeEncodingsData():
 	fr, en = readData()
-	print("text read from disk")
-	print(CONST.LAPSED_TIME())
 
 	fr = cleanText(fr, "fr")
 	en = cleanText(en, "en")
@@ -129,9 +129,10 @@ def writeEncodingsData():
 	# write word encoding to file
 	writeWordEncoding(fr, "fr")
 	writeWordEncoding(en, "en")
-	# write character encoding to file
-	writeCharEncoding(fr, "fr")
-	writeCharEncoding(en, "en")
+	if CONST.INCLUDE_CHAR_EMBEDDING:
+		# write character encoding to file
+		writeCharEncoding(fr, "fr")
+		writeCharEncoding(en, "en")
 	
 	writeEncodedData(fr, "fr")
 	writeEncodedData(en, "en")
@@ -155,7 +156,7 @@ def writeEncoding(encoding, name):
 	encoding.append(CONST.START_OF_SEQUENCE_TOKEN)	# start of sequence
 	encoding.append(CONST.END_OF_SEQUENCE_TOKEN)	# end of sequence
 
-	with open(CONST.ENCODING_PATH + name + ".json", "w") as f:
+	with open(CONST.ENCODINGS + name + ".json", "w") as f:
 		f.write(json.dumps(encoding))
 
 	print(name + " encoding size : "+str(len(encoding)))
@@ -164,16 +165,24 @@ def writeEncoding(encoding, name):
 def writeEncodedData(data, language):
 	#encoded data
 	wordEncoded = encodeWords(data, language)
-	charForwardEncoded = encodeCharsForward(data, language)
-	charBackwardEncoded = encodeCharsBackward(data, language)
+	if CONST.INCLUDE_CHAR_EMBEDDING:
+		charForwardEncoded = encodeCharsForward(data, language)
+		charBackwardEncoded = encodeCharsBackward(data, language)
 
 	print("input text encoded words   : "+str(wordEncoded.shape))
-	print("input text encoded char(f) : "+str(charForwardEncoded.shape))
-	print("input text encoded char(b) : "+str(charBackwardEncoded.shape))
+	if CONST.INCLUDE_CHAR_EMBEDDING:
+		print("input text encoded char(f) : "+str(charForwardEncoded.shape))
+		print("input text encoded char(b) : "+str(charBackwardEncoded.shape))
 	
-	np.savez_compressed(CONST.PROCESSED_DATA + language + "EncodedData", encoded=wordEncoded, charForwardEncoded=charForwardEncoded, charBackwardEncoded=charBackwardEncoded)
+	if CONST.INCLUDE_CHAR_EMBEDDING:
+		np.savez_compressed(CONST.PROCESSED_DATA + language + "EncodedData", encoded=wordEncoded, charForwardEncoded=charForwardEncoded, charBackwardEncoded=charBackwardEncoded)
+	else:
+		np.savez_compressed(CONST.PROCESSED_DATA + language + "EncodedData", encoded=wordEncoded)
 
-	return wordEncoded, charForwardEncoded, charBackwardEncoded
+	if CONST.INCLUDE_CHAR_EMBEDDING:
+		return wordEncoded, charForwardEncoded, charBackwardEncoded
+	else:
+		return (wordEncoded,)
 
 
 # encode the data
@@ -181,7 +190,7 @@ def encodeWords(data, language):
 	maxSequenceLenth = max([line.count(CONST.UNIT_SEP)+1 for line in data]) + 2		#start and end of sequence
 	encodedData = np.zeros((len(data), maxSequenceLenth),dtype="uint16")			#initialize zero array
 
-	with open(CONST.ENCODING_PATH+language+"_word.json", "r") as f:
+	with open(CONST.ENCODINGS+language+"_word.json", "r") as f:
 		encoding = {word:i for i,word in enumerate(json.load(f))}
 
 	for i,line in enumerate(data):
@@ -211,7 +220,7 @@ def encodeChars(data, language):
 	maxSequenceLenth = max([line.count(CONST.UNIT_SEP)+1 for line in data]) + 2					#start and end of sequence
 	encodedData = np.zeros((len(data), maxSequenceLenth, CONST.CHAR_INPUT_SIZE),dtype="uint8")		#initialize zero array
 
-	with open(CONST.ENCODING_PATH+language+"_char.json", "r") as f:
+	with open(CONST.ENCODINGS+language+"_char.json", "r") as f:
 		encoding = {ch:i for i,ch in enumerate(json.load(f))}
 
 	for i,line in enumerate(data):

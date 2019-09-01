@@ -8,37 +8,40 @@ from .processing import preparedata as PD
 
 
 def encoderEncodeData(data, language):
-	wordData, charData = encodeData(data, language)
-	charData = np.reshape(charData, (charData.shape[0], -1))
+	data = encodeData(data, language)
+	if CONST.INCLUDE_CHAR_EMBEDDING:
+		data[1] = np.reshape(data[1], (data[1].shape[0], -1))
 
-	return wordData, charData
+	return data
 
 
-def decoderEncodeData(data, language, initial=False):
-	wordData, charData = encodeData(data, language)
+def decoderEncodeData(data, language, initial=False, onlyLastWord=True):
+	data = encodeData(data, language)
 	if initial:
-		wordData = wordData[:,0]
-		charData = charData[:,0]
-	else:
-		wordData = wordData[:,1]
-		charData = charData[:,1]
-	charData = np.reshape(charData, (charData.shape[0], -1))
+		data = [x[:,0] for x in data]
+	elif onlyLastWord:
+		data = [x[:,1] for x in data]
+	if CONST.INCLUDE_CHAR_EMBEDDING:
+		data[1] = np.reshape(data[1], (data[1].shape[0], -1))
 
-	return wordData, charData
+	return data
 
 
 def encodeData(data, language):
 	wordData = PD.encodeWords(data, language)
-	charForwardData = PD.encodeCharsForward(data, language)
-	charBackwardData = PD.encodeCharsBackward(data, language)
-	charData = np.concatenate((charForwardData, charBackwardData), axis=2)
+	data = [wordData]
+	if CONST.INCLUDE_CHAR_EMBEDDING:
+		charForwardData = PD.encodeCharsForward(data, language)
+		charBackwardData = PD.encodeCharsBackward(data, language)
+		charData = np.concatenate((charForwardData, charBackwardData), axis=2)
+		data.append(charData)
 
-	return wordData, charData
+	return data
 
 
 def decodeWord(wordOut, alphas, language):
 	#get output word encodings
-	with open(CONST.ENCODING_PATH+language+"_word.json", "r") as f:
+	with open(CONST.ENCODINGS+language+"_word.json", "r") as f:
 		wordEncoding = {w:i for i,w in enumerate(json.load(f))}
 
 	outputWord = [wordEncoding[word] for word in np.argmax(wordOut, axis=-1)]
@@ -64,19 +67,19 @@ def prepareSentences(wordLists):
 
 def translate(inputStrings, startLang="fr", endLang="en"):
 	#get model
-	_, (samplingModelInit, samplingModelNext) = loadModel()
+	_, (samplingModelInit, samplingModelNext) = loadModel(modelNum, loadOptimizerWeights=False)
 
 
 	# prepare input sentence
 	cleanData = PD.cleanText(inputStrings, startLang)
-	wordData, charData = encoderEncodeData(cleanData, startLang)
+	encoderData = encoderEncodeData(cleanData, startLang)
 	
 	# prepare decoder input
 	initialOutput = ["" for _ in inputStrings]
-	decoderWordData, decoderCharData = decoderEncodeData(initialOutput, endLang, initial=True)
+	decoderData = decoderEncodeData(initialOutput, endLang, initial=True)
 	
 	# decode first word
-	[wordOut, preprocessedEncoder, decoderH, decoderC, alphas] = samplingModelInit([wordData, charData, decoderWordData, decoderCharData])
+	[wordOut, preprocessedEncoder, decoderH, decoderC, alphas] = samplingModelInit(encoderData + decoderData)
 	outputStringsNext = decodeWord(wordOut, alphas, endLang)
 
 	predictedWords = [outputStringsNext]
@@ -84,8 +87,8 @@ def translate(inputStrings, startLang="fr", endLang="en"):
 	
 	while continueTranslation and len(predictedWords) < CONST.MAX_TRANSLATION_LENGTH:
 		# decode rest of the sentences
-		decoderWordData, decoderCharData = decoderEncodeData(outputStringsNext, endLang)
-		[wordOut, preprocessedEncoder, decoderH, decoderC, alphas] = samplingModelNext([preprocessedEncoder, decoderH, decoderC, decoderWordData, decoderCharData])
+		decoderData = decoderEncodeData(outputStringsNext, endLang)
+		[wordOut, preprocessedEncoder, decoderH, decoderC, alphas] = samplingModelNext([preprocessedEncoder, decoderH, decoderC] + decoderData)
 
 		# decode predicted word
 		outputStringsNext = decodeWord(wordOut, alphas, endLang)

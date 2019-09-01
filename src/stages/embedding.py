@@ -7,7 +7,7 @@ from .. import constants as CONST
 
 def positionalEncoding(x):
 	from keras import backend as K
-	from .. import constants as CONST
+	#from .. import constants as CONST
 	
 	positionEncoding = K.variable(CONST.MAX_POSITIONAL_EMBEDDING)[0:K.shape(x)[1], 0:CONST.EMBEDDING_SIZE]
 	positionEncoding = K.tile(K.expand_dims(positionEncoding, 0), [K.shape(x)[0],1,1])

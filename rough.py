@@ -111,11 +111,19 @@ def positionEncodingSpeed():
 	return positionEncoding	
 		
 
-from keras import backend as K
-import numpy as np
-import time
-startTime = time.time()
-print("start")
-for _ in range(1):
-	(positionEncodingSpeed().shape)
-print(time.time() - startTime)
+def futureMask():
+	from keras import backend as K
+	import numpy as np
+
+	batchShape = 3
+	seqLen = 5
+
+	m = np.arange(seqLen)
+	m1 = np.tile(np.expand_dims(m, 0), [seqLen, 1])
+	m2 = np.tile(np.expand_dims(m, 1), [1, seqLen])
+	#mask = np.cast(np.greater_equal(m1, m2), "float32")
+	mask = np.greater_equal(m2, m1).astype("float32")
+	mask = np.tile(np.expand_dims(mask, 0), [batchShape, 1, 1])
+	print(mask)
+
+futureMask()

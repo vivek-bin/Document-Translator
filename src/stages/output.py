@@ -4,7 +4,7 @@ from keras import layers
 from .. import constants as CONST
 
 
-def outputStage(outputVocabularySize, contextSize, name=""):
+def recurrentOutputStage(outputVocabularySize, contextSize, name=""):
 	decoderEmbedding = layers.Input(batch_shape=(None,None,CONST.EMBEDDING_SIZE))
 	decoderOut = layers.Input(batch_shape=(None,None,contextSize))
 	contextOut = layers.Input(batch_shape=(None,None,contextSize))

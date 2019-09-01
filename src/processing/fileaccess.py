@@ -8,7 +8,7 @@ def readFile(fileName):
 	file = []
 	with open(fileName, encoding="utf8") as f:
 		file = list(f)
-	file = [l.lower() for l in file]
+
 	return file
 
 def readArchiveFile(fileName):
@@ -18,16 +18,16 @@ def readArchiveFile(fileName):
 	file = file.strip().split("\n")
 	return file
 	
-	
-def loadEuroParl():
-	fileFr = readFile(CONST.EUROPARL_FR)
-	fileEn = readFile(CONST.EUROPARL_EN)
+
+def loadStandard(name):
+	fileFr = readFile(CONST.DATA + name + ".fr")
+	fileEn = readFile(CONST.DATA + name + ".en")
 
 	if len(fileEn) != len(fileFr):
-		raise Exception("EuroParl corpus lengths mismatch")
+		raise Exception("{0} corpus lengths mismatch! en:{1} vs fr:{2}".format(name, len(fileEn), len(fileFr)))
 
-	print("europarl length = "+str(len(fileEn)))
-	return fileFr,fileEn
+	print(name + " length = "+str(len(fileEn)))
+	return fileFr, fileEn
 	
 	
 def loadHansards():
@@ -44,8 +44,22 @@ def loadHansards():
 	if len(fileEn) != len(fileFr):
 		raise Exception("Hansards corpus lengths mismatch")
 
-	print("hansards length = "+str(len(fileEn)))
-	return fileFr,fileEn
+	print("Hansards length = "+str(len(fileEn)))
+	return fileFr, fileEn
+	
+
+def loadFraEng():
+	fileBoth = readFile(CONST.FRA_EN_DATA)
+	fileBoth = [line.split("\t") for line in fileBoth]
+	fileEn = [x[0] for x in fileBoth]
+	fileFr = [x[1] for x in fileBoth]
+
+	lineSplitCheck = [len(x) for x in fileBoth if len(x)!= 2]
+	if lineSplitCheck:
+		raise Exception("Fra-eng corpus erroneous tabs")
+
+	print("fra-eng length = "+str(len(fileEn)))
+	return fileFr, fileEn
 	
 
 
