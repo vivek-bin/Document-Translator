@@ -76,7 +76,7 @@ def loadModel(modelNum, loadOptimizerWeights=True):
 		trainingModel, samplingModels = translationLSTMAttModel()
 	else:
 		trainingModel, samplingModels = translationTransformerModel()
-	trainingModel.compile(optimizer=Adam(lr=CONST.LEARNING_RATE, decay=CONST.LEARNING_RATE_DECAY), loss=CONST.LOSS_FUNCTION, metrics=[CONST.EVALUATION_METRIC])
+	trainingModel.compile(optimizer=Adam(lr=CONST.LEARNING_RATE, decay=CONST.LEARNING_RATE_DECAY/CONST.DATA_PARTITIONS), loss=CONST.LOSS_FUNCTION, metrics=[CONST.EVALUATION_METRIC])
 	trainingModel.summary()
 
 	#load checkpoint if available

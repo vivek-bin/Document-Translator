@@ -23,10 +23,11 @@ def sqrtScaleHideFuture(x):
 
 	return (x * mask)/scale
 
-def dotAttention(count=0, hideFuture=False):
-	query = layers.Input(batch_shape=(None,None,None))
-	key = layers.Input(batch_shape=(None,None,None))
-	value = layers.Input(batch_shape=(None,None,None))
+
+def dotAttentionFunc(inputs=[], hideFuture=False):
+	query = inputs[0]
+	key = inputs[1]
+	value = inputs[2]
 
 	#generate alphas
 	alphas = layers.Dot(axes=2)([query, key])
@@ -37,8 +38,7 @@ def dotAttention(count=0, hideFuture=False):
 	valuePerm = layers.Permute((2,1))(value)
 	contextOut = layers.Dot(axes=2)([alphas, valuePerm])
 
-	attention = Model(inputs=[query, key, value], outputs=[contextOut, alphas], name="attention_head_"+str(count))
-	return attention
+	return [contextOut, alphas]
 
 
 def basicAttentionStage(inputSize=CONST.NUM_LSTM_UNITS):
@@ -55,7 +55,7 @@ def basicAttentionStage(inputSize=CONST.NUM_LSTM_UNITS):
 	keyAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS, activation=CONST.DENSE_ACTIVATION))(keyNorm)
 	
 	# attention!
-	[contextOut, alphas] = dotAttention()([queryAttentionIn, keyAttentionIn, keyNorm])
+	[contextOut, alphas] = dotAttentionFunc([queryAttentionIn, keyAttentionIn, keyNorm])
 
 	attentionModel = Model(inputs=[query, key], outputs=[contextOut, alphas], name="attention_stage")
 	return attentionModel
@@ -80,7 +80,7 @@ def multiHeadAttentionStage(inputSize, h=CONST.NUM_ATTENTION_HEADS, count=0, hid
 		valueAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS//h, activation=CONST.DENSE_ACTIVATION))(keyNorm)
 		
 		# attention!
-		[contextOut, alphas] = dotAttention(count=count*h+i, hideFuture=hideFuture)([queryAttentionIn, keyAttentionIn, valueAttentionIn])
+		[contextOut, alphas] = dotAttentionFunc([queryAttentionIn, keyAttentionIn, valueAttentionIn], hideFuture=hideFuture)
 
 		alphasList.append(alphas)
 		contextList.append(contextOut)
