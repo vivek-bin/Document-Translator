@@ -191,7 +191,7 @@ def translationTransformerModel():
 	################################
 	###########
 	#first step prediction model
-	samplingModelInit = Model(inputs=encoderInput + decoderInput, outputs=[wordOut, encoderContext, alphas], name="TransformerSamplingInit")
+	samplingModelInit = Model(inputs=encoderInput + decoderInput, outputs=[wordOut, alphas, encoderContext], name="TransformerSamplingInit")
 
 	###########
 	#next steps prediction model
@@ -207,7 +207,7 @@ def translationTransformerModel():
 
 	wordOut = outputStage_SHARED(decoderContext)
 	
-	samplingModelNext = Model(inputs=[preprocessedEncoder] + decoderInput, outputs=[wordOut, preprocessedEncoder, alphas], name="TransformerSamplingNext")
+	samplingModelNext = Model(inputs=[preprocessedEncoder] + decoderInput, outputs=[wordOut, alphas, preprocessedEncoder], name="TransformerSamplingNext")
 
 	return trainingModel, (samplingModelInit, samplingModelNext)
 

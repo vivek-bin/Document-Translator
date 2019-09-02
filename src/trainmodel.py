@@ -14,31 +14,27 @@ from .models.models import *
 
 class DataPartitioningSequence(Sequence):
 	def __init__(self, x, y, batchSize, numPartitions, initialEpoch=0):
-		self.xFull = x
-		self.yFull = y
+		self.x = x
+		self.y = y
 		self.epoch = initialEpoch
 		self.batchSize = batchSize
 		self.numPartitions = numPartitions
-		self.setPartition()
+		self.partitionSize = int(np.ceil(len(self.x[0])/self.numPartitions))
+		self.partitionOffset = self.partitionSize * ((self.epoch-1) % self.numPartitions)
 
 	def __len__(self):
-		return int(np.ceil(len(self.x) / self.batchSize))
+		return int(np.ceil(len(self.x[0][self.partitionOffset:self.partitionOffset+self.partitionSize]) / self.batchSize))
 
 	def __getitem__(self, idx):
-		xBatch = [x[idx * self.batchSize:(idx + 1) * self.batchSize] for x in self.x]
-		yBatch = self.y[idx * self.batchSize:(idx + 1) * self.batchSize]
+		batchIdx = self.partitionOffset + idx * self.batchSize
+		xBatch = [a[batchIdx:batchIdx + self.batchSize] for a in self.x]
+		yBatch = [a[batchIdx:batchIdx + self.batchSize] for a in self.y]
 
 		return xBatch, yBatch
 
-	def setPartition(self):
-		p = self.epoch % self.numPartitions		#activate partition
-		partitionSize = int(np.ceil(len(self.xFull)/self.numPartitions))
-		self.x = [xFull[p * partitionSize:(p+1) * partitionSize] for xFull in self.xFull]
-		self.y = self.yFull[p * partitionSize:(p+1) * partitionSize]
-
 	def on_epoch_end(self):
 		self.epoch += 1
-		self.setPartition()
+		self.partitionOffset = self.partitionSize * ((self.epoch-1) % self.numPartitions)
 
 
 def saveModels(trainingModel, modelName, samplingModels=False):
@@ -128,15 +124,21 @@ def getTrainingData(startLang, endLang):
 	outputData = outData[0]
 	outputData = np.pad(outputData,((0,0),(0,1)), mode='constant')[:,1:]
 	outputData = [np.expand_dims(outputData,axis=-1)]					#for sparse categorical
-	trainingSplit = int(CONST.TRAIN_SPLIT_PCT * len(inputData[0]))
-
-	trainIn = [x[:trainingSplit] for x in inputData]
-	testIn = [x[trainingSplit:] for x in inputData]
 	
-	trainOut = [x[:trainingSplit] for x in outputData]
+	
+	trainingSplit = int(CONST.TRAIN_SPLIT_PCT * len(inputData[0]))
+	validationSplit = int(trainingSplit*CONST.VALIDATION_SPLIT_PCT)
+	
+	trainIn = [x[:trainingSplit-validationSplit] for x in inputData]
+	trainOut = [x[:trainingSplit-validationSplit] for x in outputData]
+
+	valIn = [x[trainingSplit-validationSplit:trainingSplit] for x in inputData]
+	valOut = [x[trainingSplit-validationSplit:trainingSplit] for x in outputData]
+
+	testIn = [x[trainingSplit:] for x in inputData]
 	testOut = [x[trainingSplit:] for x in outputData]
 
-	return (trainIn, trainOut), (testIn, testOut)
+	return (trainIn, trainOut), (valIn, valOut), (testIn, testOut)
 
 
 def trainModel(modelNum):
@@ -144,20 +146,16 @@ def trainModel(modelNum):
 	trainingModel, _ = loadModel(modelNum)
 
 	# load all data
-	(xTrain, yTrain), (_, _) = getTrainingData(startLang="fr", endLang="en")
+	(xTrain, yTrain), (xVal, yVal), (_, _) = getTrainingData(startLang="fr", endLang="en")
 
 	# start training
 	initialEpoch = getLastEpoch(trainingModel.name)
 	callbacks = []
-	callbacks.append(ModelCheckpoint(CONST.MODELS + trainingModel.name + CONST.MODEL_CHECKPOINT_NAME_SUFFIX, monitor=CONST.EVALUATION_METRIC, mode='max',save_best_only=True))
-	validationSplit = int(len(yTrain)*CONST.VALIDATION_SPLIT_PCT)
-	xVal = [x[:validationSplit] for x in xTrain]
-	yVal = yTrain[:validationSplit]
-	xTrain = [x[validationSplit:] for x in xTrain]
-	yTrain = yTrain[validationSplit:]
+	callbacks.append(ModelCheckpoint(CONST.MODELS + trainingModel.name + CONST.MODEL_CHECKPOINT_NAME_SUFFIX, monitor=CONST.EVALUATION_METRIC, mode='max', save_best_only=True))
+
 	trainingDataGenerator = DataPartitioningSequence(x=xTrain, y=yTrain, batchSize=CONST.BATCH_SIZE, numPartitions=CONST.DATA_PARTITIONS, initialEpoch=initialEpoch)
 	_ = trainingModel.fit_generator(trainingDataGenerator, validation_data=(xVal, yVal), epochs=CONST.NUM_EPOCHS*CONST.DATA_PARTITIONS, callbacks=callbacks, initial_epoch=initialEpoch)
-	#_ = trainingModel.fit(x=xTrain, y=yTrain, epochs=CONST.NUM_EPOCHS, batch_size=CONST.BATCH_SIZE, validation_split=CONST.VALIDATION_SPLIT_PCT, callbacks=callbacks, initial_epoch=initialEpoch)
+	#_ = trainingModel.fit(x=xTrain, y=yTrain, epochs=CONST.NUM_EPOCHS, batch_size=CONST.BATCH_SIZE, validation_data=(xVal, yVal), callbacks=callbacks, initial_epoch=initialEpoch)
 
 	trainingModel.save(CONST.MODELS + trainingModel.name + CONST.MODEL_TRAINED_NAME_SUFFIX)
 

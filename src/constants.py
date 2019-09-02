@@ -45,8 +45,8 @@ PROCESSED_DATA = DATA + "processed input/"
 
 
 ###data parameters
-DATA_COUNT = int(0.0010 * 1000 * 1000)
-DATA_PARTITIONS = 4
+DATA_COUNT = int(10 * 1000 * 1000)
+DATA_PARTITIONS = 1
 
 UNIT_SEP = "\x1f"
 MASK_TOKEN = "MASK"
