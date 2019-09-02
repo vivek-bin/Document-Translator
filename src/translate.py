@@ -67,15 +67,16 @@ class Translater:
 	def decodeWord(self, wordSoftmax, alpha, cleanString):
 		#get output word encodings
 		topPredictions = np.argsort(-wordSoftmax)[:CONST.BEAM_SIZE]
+		score = wordSoftmax[topPredictions]
+
 		outputWord = []
-		score = []
 		for wordIndex in topPredictions:
 			word = None
 			try:
 				word = self.endLangEncoding[wordIndex]
 			except KeyError:
 				pass
-			if not word:
+			if not word or word == CONST.UNKNOWN_TOKEN:
 				encoderPosition = np.argmax(alpha)
 				originalWord = cleanString.split(CONST.UNIT_SEP)[encoderPosition]
 				try:
@@ -84,7 +85,6 @@ class Translater:
 					word = originalWord
 
 			outputWord.append([word])
-			score.append(wordSoftmax[wordIndex])
 
 		return outputWord, score
 
@@ -97,18 +97,20 @@ class Translater:
 	def sampleFirstWord(self, cleanString):
 		encoderInput = self.encoderEncodeData(cleanString)
 		decoderInput = self.decoderEncodeData([""], initial=True)
-		# decode first word
+		# sample first word
 		outputs = self.samplingModelInit(encoderInput + decoderInput)
 		wordOut = outputs[0]
 		alphas = outputs[1]
+		# prepare preproessed encoder for future sampling
 		preprocessed = outputs[2:]
 		preprocessed = [np.repeat(x, CONST.BEAM_SIZE, 0) for x in preprocessed]
 
+		# decode predicted word
 		wordSoftmax = wordOut[0,0]
 		alpha = alphas[0,0]
 		startingWord, initialScore = self.decodeWord(wordSoftmax, alpha, cleanString)
-		initialScore = [-s for s in initialScore]										#negated scores for sorting later
-		return (startingWord, initialScore), preprocessed					
+		
+		return (startingWord, -initialScore), preprocessed									#negated scores for sorting later				
 
 
 	def __call__(self, inputString):
@@ -116,42 +118,57 @@ class Translater:
 		cleanString = PD.cleanText(inputString, self.startLang)
 		(startingWord, cumulativeScore), preprocessed = self.sampleFirstWord(cleanString)
 		
-		predictedWords = [startingWord]
-		continueTranslation = False
+		predictedWords = startingWord
 		nextDecoderInputWord = startingWord
-		while continueTranslation and len(predictedWords) < CONST.MAX_TRANSLATION_LENGTH:
+		while len(predictedWords) < CONST.MAX_TRANSLATION_LENGTH:
 			# decode rest of the sentences
 			decoderInput = self.decoderEncodeData(nextDecoderInputWord)
 			outputs = self.samplingModelNext(preprocessed + decoderInput)
 			wordOut = outputs[0]
 			alphas = outputs[1]
+			preprocessed = outputs[2:]
 			
-			# decode predicted word
+			# decode all sampled words
 			allScores = []
 			allPredictions = []
+			endOfSequence = []
 			for i in range(CONST.BEAM_SIZE):
 				wordSoftmax = wordOut[i,0]
 				alpha = alphas[i,0]
 				predictedWord, score = self.decodeWord(wordSoftmax, alpha, cleanString)
-				allScores.append([s*cumulativeScore[i] for s in score])						
-				allPredictions.append(predictedWord)
-			bestPredictions = np.argsort(np.array(allScores).reshape((-1)))[:CONST.BEAM_SIZE]
+				if CONST.END_OF_SEQUENCE_TOKEN in [w for wl in predictedWord for w in wl]:		# if any prediction contained END OF SEQUENCE, translation finished
+					endOfSequence.append(i)
 
+				allScores.append(cumulativeScore[i] * score)						# cumulate scores with existing sequences
+				allPredictions.append(predictedWord)
+
+			if endOfSequence:
+				bestScoreFromEOS = np.min(cumulativeScore[endOfSequence])
+				i = np.where(cumulativeScore == bestScoreFromEOS)[0]
+				outputString = self.prepareSentences(predictedWords[i])
+				return outputString
+
+
+			# get highest scoring sequences
+			bestPredictions = np.argsort(np.concatenate(allScores))[:CONST.BEAM_SIZE]
+			cumulativeScore = np.concatenate(allScores)[bestPredictions]
+
+			# get best sequences and highest scoring words for next prediction 
 			nextDecoderInputWord = []
-			cumulativeScore = []
+			predictedWordsNext = []
 			for b in bestPredictions:
 				i = b / CONST.BEAM_SIZE
 				j = b % CONST.BEAM_SIZE
+				predictedWordsNext.append(predictedWords[i] + allPredictions[i][j])
 				nextDecoderInputWord.append(allPredictions[i][j])
-				cumulativeScore.append(allScores[i][j])
+			# update states for next sampling according to selected best words
+			stateIndices = bestPredictions / CONST.BEAM_SIZE
+			preprocessed = [p[stateIndices] for p in preprocessed]
 
-			predictedWords.append(nextDecoderInputWord)
-			if [True for xl in nextDecoderInputWord if CONST.END_OF_SEQUENCE_TOKEN in xl]:			# if any prediction contained END OF SEQUENCE, end translation
+			predictedWords = predictedWordsNext
+			if [True for xl in nextDecoderInputWord if CONST.END_OF_SEQUENCE_TOKEN in xl]:			
 				break
 
 		bestSentenceIndex = np.argmin(cumulativeScore)
-		bestSentenceList = [wordStep[bestSentenceIndex] for wordStep in predictedWords]
-		outputStrings = self.prepareSentences(bestSentenceList)
-
-
-		return outputStrings
+		outputString = self.prepareSentences(predictedWords[bestSentenceIndex])
+		return outputString
