@@ -108,7 +108,7 @@ def translationLSTMAttModel():
 	[contextOut, alphas] = attentionLayer_SHARED([decoderOut, preprocessedEncoder])
 	wordOut = outputStage_SHARED([contextOut, decoderOut, decoderEmbedding])
 	
-	samplingModelNext = Model(inputs=[preprocessedEncoder] + previousStates + decoderInput, outputs=[wordOut, alphas, preprocessedEncoder] + decoderStates, name="AttLSTMSamplingNext")
+	samplingModelNext = Model(inputs=[preprocessedEncoder] + previousStates + decoderInput, outputs=[wordOut, alphas] + decoderStates, name="AttLSTMSamplingNext")
 
 	return trainingModel, (samplingModelInit, samplingModelNext)
 
@@ -207,7 +207,7 @@ def translationTransformerModel():
 
 	wordOut = outputStage_SHARED(decoderContext)
 	
-	samplingModelNext = Model(inputs=[preprocessedEncoder] + decoderInput, outputs=[wordOut, alphas, preprocessedEncoder], name="TransformerSamplingNext")
+	samplingModelNext = Model(inputs=[preprocessedEncoder] + decoderInput, outputs=[wordOut, alphas], name="TransformerSamplingNext")
 
 	return trainingModel, (samplingModelInit, samplingModelNext)
 

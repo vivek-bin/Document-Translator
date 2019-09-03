@@ -28,7 +28,6 @@ def matMulSample():
 		print(np.matmul(M.eval()[1], U.eval()[1]))
 
 
-
 def repeatLayerTry():
 	import keras
 
@@ -64,7 +63,6 @@ def dotLayerTry():
 	print(dec)
 	#print(model.predict([enc,dec])[0])
 	print(model.predict([enc,dec]))
-
 
 
 def multiPartModel():
@@ -126,4 +124,44 @@ def futureMask():
 	mask = np.tile(np.expand_dims(mask, 0), [batchShape, 1, 1])
 	print(mask)
 
-futureMask()
+
+def readDictionaryPDF(bestWordOnly=True):
+	from src import constants as CONST
+	from PyPDF2 import PdfFileReader
+
+	with open(CONST.DICTIONARY_PATH, "rb") as pdfFileBinary:
+		pdfFile = PdfFileReader(pdfFileBinary)
+		pageTexts = []
+		for i in range(3, pdfFile.numPages-1):
+			footerLen = len("English-french (dictionnaire)English-french Dictionary\n" + str(i))
+			pageTexts.append(pdfFile.getPage(i).extractText()[:-footerLen].split("\n"))
+
+	dictList = [x.lower().split(":") for page in pageTexts for x in page if x]
+	engToFrDict = {x[0].strip():[v.strip() for v in x[1].split(", ")] for x in dictList}
+	
+	frToEngDict = {}
+	for key, valueList in engToFrDict.items():
+		for value in valueList:
+			try:
+				frToEngDict[value].append(key)
+			except KeyError:
+				frToEngDict[value] = [key]
+	
+	print(engToFrDict["diagnosed"])
+	print(frToEngDict["un à un"])
+	
+	if bestWordOnly:
+		# already sorted as such in dictionary for eng->fr
+		engToFrDict = {key:valueList[0] for key,valueList in engToFrDict.items()}
+
+		# select shortest word as best
+		frToEngDict = {key:[v for v in valueList if len(v) == min([len(v) for v in valueList])][0] for key, valueList in frToEngDict.items()}
+
+	
+	print(engToFrDict["diagnosed"])
+	print(frToEngDict["un à un"])
+	
+	return engToFrDict, frToEngDict
+
+
+readDictionaryPDF()

@@ -70,23 +70,24 @@ def getLastEpoch(modelName):
 	
 	return 0
 
-def loadModel(modelNum, loadOptimizerWeights=True):
+def loadModel(modelNum, loadForTraining=True):
 	#get model
 	if modelNum == 1:
 		trainingModel, samplingModels = translationLSTMAttModel()
 	else:
 		trainingModel, samplingModels = translationTransformerModel()
-	trainingModel.compile(optimizer=Adam(lr=CONST.LEARNING_RATE, decay=CONST.LEARNING_RATE_DECAY/CONST.DATA_PARTITIONS), loss=CONST.LOSS_FUNCTION, metrics=[CONST.EVALUATION_METRIC])
-	trainingModel.summary()
+	if loadForTraining:
+		trainingModel.compile(optimizer=Adam(lr=CONST.LEARNING_RATE, decay=CONST.LEARNING_RATE_DECAY/CONST.DATA_PARTITIONS), loss=CONST.LOSS_FUNCTION, metrics=[CONST.EVALUATION_METRIC])
+		trainingModel.summary()
 
 	#load checkpoint if available
 	checkPointName = getLastCheckpoint(trainingModel.name)
 	if checkPointName:
-		trainingModel.load_weights(CONST.MODELS + checkPointName)
 		samplingModels[0].load_weights(CONST.MODELS + checkPointName)
 		samplingModels[1].load_weights(CONST.MODELS + checkPointName, by_name=True)
 
-		if loadOptimizerWeights:
+		if loadForTraining:
+			trainingModel.load_weights(CONST.MODELS + checkPointName)
 			tempModel = load_model(CONST.MODELS + checkPointName, custom_objects={"CONST": CONST})
 			trainingModel._make_train_function()
 			weight_values = K.batch_get_value(getattr(tempModel.optimizer, 'weights'))

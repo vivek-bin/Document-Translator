@@ -38,9 +38,12 @@ def main():
 		trainModel(modelNum)
 
 	if translateFlag:
-		from src.translate import translate
-		text = [""]
-		_ = translate(text)
+		from src.translate import Translater
+		frToEngTranslater = Translater(startLang="fr",endLang="en")
+		print(CONST.LAPSED_TIME())
+		text = ["Ma question porte sur un sujet qui est à l'ordre du jour du jeudi et que je soulèverai donc une nouvelle fois."]
+		print(frToEngTranslater(text))
+		print(CONST.LAPSED_TIME())
 
 
 	return True

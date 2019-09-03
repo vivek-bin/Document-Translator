@@ -40,6 +40,8 @@ HANSARDS_SENATE_TEST = HANSARDS_SENATE + "testing/"
 
 FRA_EN_DATA = DATA + "fra-eng/fra.txt"
 
+DICTIONARY_PATH = DATA + "English-French_Dictionary.pdf"
+
 
 PROCESSED_DATA = DATA + "processed input/"
 
@@ -91,7 +93,7 @@ BATCH_SIZE = 128
 NUM_EPOCHS = 40
 VALIDATION_SPLIT_PCT = 0.1
 VALIDATION_SPLIT = int(VALIDATION_SPLIT_PCT * TRAIN_SPLIT)
-LEARNING_RATE = 0.015
+LEARNING_RATE = 0.01
 LEARNING_RATE_DECAY = 0.05
 LOSS_FUNCTION = "sparse_categorical_crossentropy"
 EVALUATION_METRIC = "sparse_categorical_accuracy"
