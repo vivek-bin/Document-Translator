@@ -10,7 +10,7 @@ def main():
 	translateFlag = False
 
 	if not flags:
-		trainModelFlag = True
+		translateFlag = True
 		modelNum = 1
 	else:
 		for flag in flags:

@@ -48,9 +48,9 @@ class Translater:
 		data = [x for xl in data for x in xl]
 		data = self.encodeData(data, self.endLang)
 		if initial:
-			data = [x[:,0] for x in data]
+			data = [x[:,0:1] for x in data]
 		elif onlyLastWord:
-			data = [x[:,1] for x in data]
+			data = [x[:,1:2] for x in data]
 		else:
 			data = [x[:,:-1] for x in data]
 		if CONST.INCLUDE_CHAR_EMBEDDING:
@@ -63,8 +63,7 @@ class Translater:
 		#get output word encodings
 		topPredictions = np.argsort(-wordSoftmax)[:CONST.BEAM_SIZE]
 		score = wordSoftmax[topPredictions]
-		#originalWordParts = [CONST.START_OF_SEQUENCE_TOKEN] + cleanString[0].split(CONST.UNIT_SEP) + [CONST.END_OF_SEQUENCE_TOKEN]
-		originalWordParts = cleanString[0].split(CONST.UNIT_SEP)
+		originalWordParts = [CONST.START_OF_SEQUENCE_TOKEN] + cleanString[0].split(CONST.UNIT_SEP) + [CONST.END_OF_SEQUENCE_TOKEN]
 
 		outputWord = []
 		for wordIndex in topPredictions:
@@ -75,11 +74,13 @@ class Translater:
 				print("not found in dictionary; should not happen as should become UNK token if OOV")
 			if not word or word == CONST.UNKNOWN_TOKEN:
 				encoderPosition = np.argmax(alpha)
-				originalWord = originalWordParts[encoderPosition-1]
+				originalWord = originalWordParts[encoderPosition]
 				try:
 					word = self.wordDictionary[originalWord]
 				except KeyError:
 					word = originalWord
+				if word in ("SOS", "EOS"):
+					word = ""
 
 			outputWord.append([word])
 
@@ -95,6 +96,7 @@ class Translater:
 	def sampleFirstWord(self, cleanString):
 		encoderInput = self.encoderEncodeData(cleanString)
 		decoderInput = self.decoderEncodeData([[""]], initial=True)
+		print(self.endLangDecoding[decoderInput[0][0][0]])
 		# sample first word
 		outputs = self.samplingModelInit.predict_on_batch(encoderInput + decoderInput)
 		wordOut = outputs[0]
@@ -108,13 +110,13 @@ class Translater:
 		alpha = alphas[0,0]
 		startingWord, initialScore = self.decodeWord(wordSoftmax, alpha, cleanString)
 		
-		return (startingWord, -initialScore), preprocessed[0], preprocessed[1:]									#negated scores for sorting later				
+		return (startingWord, -initialScore, alpha), preprocessed[0], preprocessed[1:]									#negated scores for sorting later				
 
 
 	def __call__(self, inputString):
 		# prepare input sentence
 		cleanString = PD.cleanText(inputString, self.startLang)
-		(startingWord, cumulativeScore), preprocessedEncoder, prevStates = self.sampleFirstWord(cleanString)
+		(startingWord, cumulativeScore, firstAlpha), preprocessedEncoder, prevStates = self.sampleFirstWord(cleanString)
 		
 		predictedWords = startingWord
 		nextDecoderInputWord = startingWord
@@ -145,7 +147,8 @@ class Translater:
 				bestStringIndexFromEOS = int(np.where(cumulativeScore == np.min(cumulativeScore[endOfSequence]))[0][0])
 				outputString = self.prepareSentences(predictedWords[bestStringIndexFromEOS])
 				
-				print(outputString) #return outputString
+				print(outputString) 
+				#return outputString
 
 
 			# get highest scoring sequences

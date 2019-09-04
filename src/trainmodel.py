@@ -53,7 +53,7 @@ def sparseCrossEntropyLoss(targets=None, outputs=None):
 	relevantValues = K.gather(K.flatten(outputs), shiftedtargets)
 	relevantValues = K.reshape(relevantValues, (batchSize, -1))
 	relevantValues = K.clip(relevantValues, K.epsilon(), 1. - K.epsilon())
-	cost = -K.sum(K.log(relevantValues), axis=-1)				# sum the cross entropy for all words in the sequence
+	cost = -K.sum(K.log(relevantValues), axis=-1) / K.cast(K.shape(relevantValues)[1], "float32")				# sum the cross entropy for all words in the sequence
 	return cost
 
 
