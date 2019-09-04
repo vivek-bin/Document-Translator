@@ -23,7 +23,8 @@ class DataPartitioningSequence(Sequence):
 		self.partitionOffset = self.partitionSize * ((self.epoch-1) % self.numPartitions)
 
 	def __len__(self):
-		return int(np.ceil(len(self.x[0][self.partitionOffset:self.partitionOffset+self.partitionSize]) / self.batchSize))
+		currentPartitionSize = min(self.partitionSize, len(self.x[0]) - self.partitionOffset)
+		return int(np.ceil(currentPartitionSize / self.batchSize))
 
 	def __getitem__(self, idx):
 		batchIdx = self.partitionOffset + idx * self.batchSize
@@ -35,6 +36,25 @@ class DataPartitioningSequence(Sequence):
 	def on_epoch_end(self):
 		self.epoch += 1
 		self.partitionOffset = self.partitionSize * ((self.epoch-1) % self.numPartitions)
+
+		currentPartitionSize = min(self.partitionSize, len(self.x[0]) - self.partitionOffset)
+		print("Training on data from {0} to {1}".format(self.partitionOffset, self.partitionOffset + currentPartitionSize))
+
+
+def sparseCrossEntropyLoss(targets=None, outputs=None):
+	batchSize = K.shape(outputs)[0]
+	sequenceSize = K.shape(outputs)[1]
+	vocabularySize = K.shape(outputs)[2]
+	firstPositionShifter = K.repeat(K.expand_dims(K.arange(sequenceSize) * vocabularySize, 0), batchSize)
+	secondPositionShifter = K.repeat(K.expand_dims(K.arange(batchSize) * sequenceSize * vocabularySize, 1), sequenceSize)
+
+	shiftedtargets = K.cast(K.flatten(targets), "int32") + K.flatten(firstPositionShifter) + K.flatten(secondPositionShifter)
+
+	relevantValues = K.gather(K.flatten(outputs), shiftedtargets)
+	relevantValues = K.reshape(relevantValues, (batchSize, -1))
+	relevantValues = K.clip(relevantValues, K.epsilon(), 1. - K.epsilon())
+	cost = -K.sum(K.log(relevantValues), axis=-1)				# sum the cross entropy for all words in the sequence
+	return cost
 
 
 def saveModels(trainingModel, modelName, samplingModels=False):
@@ -77,7 +97,8 @@ def loadModel(modelNum, loadForTraining=True):
 	else:
 		trainingModel, samplingModels = translationTransformerModel()
 	if loadForTraining:
-		trainingModel.compile(optimizer=Adam(lr=CONST.LEARNING_RATE, decay=CONST.LEARNING_RATE_DECAY/CONST.DATA_PARTITIONS), loss=CONST.LOSS_FUNCTION, metrics=[CONST.EVALUATION_METRIC])
+		#trainingModel.compile(optimizer=Adam(lr=CONST.LEARNING_RATE, decay=CONST.LEARNING_RATE_DECAY/CONST.DATA_PARTITIONS), loss=CONST.LOSS_FUNCTION, metrics=[CONST.EVALUATION_METRIC])
+		trainingModel.compile(optimizer=Adam(lr=CONST.LEARNING_RATE, decay=CONST.LEARNING_RATE_DECAY/CONST.DATA_PARTITIONS), loss=sparseCrossEntropyLoss, metrics=[CONST.EVALUATION_METRIC])
 		trainingModel.summary()
 
 	#load checkpoint if available
@@ -88,7 +109,7 @@ def loadModel(modelNum, loadForTraining=True):
 
 		if loadForTraining:
 			trainingModel.load_weights(CONST.MODELS + checkPointName)
-			tempModel = load_model(CONST.MODELS + checkPointName, custom_objects={"CONST": CONST})
+			tempModel = load_model(CONST.MODELS + checkPointName, custom_objects={"CONST": CONST, "sparseCrossEntropyLoss": sparseCrossEntropyLoss})
 			trainingModel._make_train_function()
 			weight_values = K.batch_get_value(getattr(tempModel.optimizer, 'weights'))
 			trainingModel.optimizer.set_weights(weight_values)
@@ -155,7 +176,8 @@ def trainModel(modelNum):
 	callbacks.append(ModelCheckpoint(CONST.MODELS + trainingModel.name + CONST.MODEL_CHECKPOINT_NAME_SUFFIX, monitor=CONST.EVALUATION_METRIC, mode='max', save_best_only=True))
 
 	trainingDataGenerator = DataPartitioningSequence(x=xTrain, y=yTrain, batchSize=CONST.BATCH_SIZE, numPartitions=CONST.DATA_PARTITIONS, initialEpoch=initialEpoch)
-	_ = trainingModel.fit_generator(trainingDataGenerator, validation_data=(xVal, yVal), epochs=CONST.NUM_EPOCHS*CONST.DATA_PARTITIONS, callbacks=callbacks, initial_epoch=initialEpoch)
+	validationDataGenerator = DataPartitioningSequence(x=xVal, y=yVal, batchSize=CONST.BATCH_SIZE, numPartitions=CONST.DATA_PARTITIONS, initialEpoch=initialEpoch)
+	_ = trainingModel.fit_generator(trainingDataGenerator, validation_data=validationDataGenerator, epochs=CONST.NUM_EPOCHS*CONST.DATA_PARTITIONS, callbacks=callbacks, initial_epoch=initialEpoch)
 	#_ = trainingModel.fit(x=xTrain, y=yTrain, epochs=CONST.NUM_EPOCHS, batch_size=CONST.BATCH_SIZE, validation_data=(xVal, yVal), callbacks=callbacks, initial_epoch=initialEpoch)
 
 	trainingModel.save(CONST.MODELS + trainingModel.name + CONST.MODEL_TRAINED_NAME_SUFFIX)

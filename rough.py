@@ -164,4 +164,25 @@ def readDictionaryPDF(bestWordOnly=True):
 	return engToFrDict, frToEngDict
 
 
-readDictionaryPDF()
+def lossFuncShiftPos():
+	from keras import backend as K
+
+	targets = K.constant([[3, 1, 2],[2, 0, 3]], dtype="int32")
+	outputs = K.constant([[[1,2,3,4,5], [6,7,8,9,10], [11,12,13,14,15]],[[16, 17, 18, 19, 20], [21, 22, 23, 24, 25], [26, 27, 28, 29, 30]]])
+
+	batchSize = K.shape(outputs)[0]
+	sequenceSize = K.shape(outputs)[1]
+	vocabularySize = K.shape(outputs)[2]
+	
+	firstPositionShifter = K.flatten(K.repeat(K.expand_dims(K.arange(sequenceSize) * vocabularySize, 0), batchSize))
+	#secondPositionShifter = K.repeat_elements(K.arange(batchSize) * sequenceSize * vocabularySize, rep=sequenceSize, axis=-1)
+	secondPositionShifter = K.flatten(K.repeat(K.expand_dims(K.arange(batchSize) * sequenceSize * vocabularySize, 1), sequenceSize))
+
+	shiftedtargets = K.flatten(targets) + firstPositionShifter + secondPositionShifter
+
+	relevantValues = K.reshape(K.gather(K.flatten(outputs), shiftedtargets), (batchSize, -1))
+	print(K.eval(firstPositionShifter))
+	print(K.eval(secondPositionShifter))
+	print(K.eval(relevantValues))
+
+lossFuncShiftPos()
