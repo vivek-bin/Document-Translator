@@ -17,11 +17,11 @@ STEMMER["fr"] = SnowballStemmer("french").stem
 #reading and cleaning the data
 def readData():
 	epFr, epEn = FA.loadStandard(CONST.EUROPARL)
-	ccFr, ccEn = FA.loadStandard(CONST.COMMON_CRAWL)
+	#ccFr, ccEn = FA.loadStandard(CONST.COMMON_CRAWL)
 	haFr, haEn = FA.loadHansards()
-	feFr, feEn = FA.loadFraEng()
-	fr = epFr + haFr + feFr + ccFr
-	en = epEn + haEn + feEn + ccEn
+	#feFr, feEn = FA.loadFraEng()
+	fr = epFr + haFr# + feFr + ccFr
+	en = epEn + haEn# + feEn + ccEn
 
 	frEn = list(zip(fr,en))
 	shuffle(frEn)
@@ -41,7 +41,7 @@ def cleanText(lines, language):
 	return lines
 
 def cleanLine(line, language):
-	line = line.lower().replace("’","'")
+	line = line.replace("’","'")
 	words = [w for s in re.findall(r'\b(?=\w*?\d)\w+(?:[\W_](?=\w*?\d)\w+)*|[^\W\d_]+|[\W_]', line) for w in re.findall(r'\s+|\S+',s)]
 	
 	words = [wordPart for word in words if word.strip() for wordPart in splitWordStem(word, language)]
@@ -51,11 +51,13 @@ def cleanLine(line, language):
 def splitWordStem(word, language):
 	global STEMMER
 	wordStem = STEMMER[language](word)
-	if word == wordStem:
+	if word.lower() == wordStem:
 		return [word]
 	else:
-		wordTrail = word[len(commonprefix([wordStem, word])):]
-		return [wordStem, CONST.WORD_STEM_TRAIL_IDENTIFIER+wordTrail]
+		commonPrefixLen = len(commonprefix([wordStem, word.lower()]))
+		wordStemOrig = word[:commonPrefixLen] + wordStem[commonPrefixLen:]
+		wordTrail = CONST.WORD_STEM_TRAIL_IDENTIFIER + word[commonPrefixLen:]
+		return [wordStemOrig, wordTrail]
 
 def limitSentenceSize(fileFr,fileEn):
 	maxWordsFr = [i for i,line in enumerate(fileFr) if line.count(CONST.UNIT_SEP) >= CONST.MAX_WORDS]
@@ -86,7 +88,7 @@ def getCharacterFrequencies(file):
 	uniqueChars = {}
 
 	for line in file:
-		for ch in line:
+		for ch in line.lower():
 			try:
 				uniqueChars[ch] += 1
 			except KeyError:
@@ -98,7 +100,7 @@ def getWordFrequencies(file):
 	wordDict = {}
 	
 	for line in file:
-		words = line.split(CONST.UNIT_SEP)
+		words = line.lower().split(CONST.UNIT_SEP)
 		for word in words:
 			try:
 				wordDict[word] += 1
@@ -195,7 +197,7 @@ def encodeWords(data, language):
 
 	for i,line in enumerate(data):
 		encodedData[i][0] = encoding[CONST.START_OF_SEQUENCE_TOKEN]
-		for j,word in enumerate(line.split(CONST.UNIT_SEP)):
+		for j,word in enumerate(line.lower().split(CONST.UNIT_SEP)):
 			try:
 				encodedData[i][j+1] = encoding[word]
 			except KeyError:
@@ -224,7 +226,7 @@ def encodeChars(data, language):
 		encoding = {ch:i for i,ch in enumerate(json.load(f))}
 
 	for i,line in enumerate(data):
-		for j,word in enumerate(line.split(CONST.UNIT_SEP)):
+		for j,word in enumerate(line.lower().split(CONST.UNIT_SEP)):
 			for k,ch in enumerate(word):
 				try:
 					encodedData[i][j+1][k] = encoding[ch]
@@ -243,7 +245,7 @@ def charExamples(en, fr):
 	for ch in frChars:
 		lines = []
 		for i, line in enumerate(fr):
-			if ch in line:
+			if ch in line.lower():
 				lines.append(fr[i] + en[i])
 			if len(lines) > 3:
 				break
@@ -253,7 +255,7 @@ def charExamples(en, fr):
 	for ch in onlyEngChars:
 		lines = []
 		for i, line in enumerate(en):
-			if ch in line:
+			if ch in line.lower():
 				lines.append(fr[i] + en[i])
 			if len(lines) > 3:
 				break
