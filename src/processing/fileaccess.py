@@ -11,8 +11,8 @@ def readFile(fileName):
 
 	return file
 
-def writeProcessedData(fileName, data):
-	with open(CONST.PROCESSED_DATA + fileName + ".txt", "w") as f:
+def writeProcessedData(data, fileName):
+	with open(CONST.PROCESSED_DATA + fileName + ".txt", "w", encoding="utf-8") as f:
 		for line in data:
 			f.write(line + "\n")
 
