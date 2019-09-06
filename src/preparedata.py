@@ -17,11 +17,11 @@ STEMMER["fr"] = SnowballStemmer("french").stem
 #reading and cleaning the data
 def readData():
 	epFr, epEn = FA.loadStandard(CONST.EUROPARL)
-	#ccFr, ccEn = FA.loadStandard(CONST.COMMON_CRAWL)
+	ccFr, ccEn = FA.loadStandard(CONST.COMMON_CRAWL)
 	haFr, haEn = FA.loadHansards()
-	#feFr, feEn = FA.loadFraEng()
-	fr = epFr + haFr# + feFr + ccFr
-	en = epEn + haEn# + feEn + ccEn
+	feFr, feEn = FA.loadFraEng()
+	fr = haFr + epFr + feFr + ccFr
+	en = haEn + epEn + feEn + ccEn
 
 	frEn = list(zip(fr,en))
 	shuffle(frEn)
@@ -113,7 +113,7 @@ def getWordFrequencies(file):
 
 
 # write encodings and encoded data to disk
-def writeEncodingsData():
+def writeEncodingsData(encodeDataToNumpy=False):
 	fr, en = readData()
 
 	fr = cleanText(fr, "fr")
@@ -136,9 +136,12 @@ def writeEncodingsData():
 		writeCharEncoding(fr, "fr")
 		writeCharEncoding(en, "en")
 	
-	writeEncodedData(fr, "fr")
-	writeEncodedData(en, "en")
-	print("encoding and encoded text saved to disk")
+	if encodeDataToNumpy:
+		writeEncodedData(fr, "fr")
+		writeEncodedData(en, "en")
+		print("encoding and encoded text saved to disk")
+	else:
+		print("cleaned text saved to disk, not encoded")
 	print(CONST.LAPSED_TIME())
 
 def writeWordEncoding(data, language):

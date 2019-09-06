@@ -11,6 +11,23 @@ def readFile(fileName):
 
 	return file
 
+def writeProcessedData(fileName, data):
+	with open(CONST.PROCESSED_DATA + fileName + ".txt", "w") as f:
+		for line in data:
+			f.write(line + "\n")
+
+def readProcessedData(fileName, startPos=0, endPos=10**10):
+	with open(CONST.PROCESSED_DATA + fileName + ".txt") as f:
+		lines = [line for i, line in enumerate(f) if i >= startPos and i < endPos]
+
+	return lines
+
+def lenProcessedData(fileName):
+	with open(CONST.PROCESSED_DATA + fileName + ".txt") as f:
+		for i, _ in enumerate(f):
+			pass
+	return i+1
+
 def readArchiveFile(fileName):
 	with gzip.open(fileName,"rb") as f:
 		file = f.read().decode("ISO-8859-1").lower()

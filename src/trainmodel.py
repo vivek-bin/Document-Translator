@@ -11,6 +11,7 @@ from keras.utils import Sequence
 
 from . import constants as CONST
 from .models.models import *
+from .processing import fileaccess as FA
 
 class DataPartitioningSequence(Sequence):
 	def __init__(self, x, y, batchSize, numPartitions, initialEpoch=0):
@@ -39,6 +40,27 @@ class DataPartitioningSequence(Sequence):
 
 		currentPartitionSize = min(self.partitionSize, len(self.x[0]) - self.partitionOffset)
 		print("Training on data from {0} to {1}".format(self.partitionOffset, self.partitionOffset + currentPartitionSize))
+
+	def loadData(self, dataSplitNumber):
+		partitionSize = int(np.ceil(len(self.x[0])/self.numPartitions))
+		partitionOffset = partitionSize * ((self.epoch-1) % self.numPartitions)
+
+		startLangData = FA.readProcessedData(startLang, partitionOffset, partitionOffset + partitionSize)
+		endLangData = FA.readProcessedData(endLang, partitionOffset, partitionOffset + partitionSize)
+
+		startLangEncoded = []
+		startLangEncoded.append(encodeWords(startLangData, startLang))
+		if CONST.INCLUDE_CHAR_EMBEDDING:
+			startLangEncoded.append(encodeCharsForward(startLangData, startLang))
+			startLangEncoded.append(encodeCharsBackward(startLangData, startLang))
+
+		endLangEncoded = []
+		endLangEncoded.append(encodeWords(endLangData, endLang))
+		if CONST.INCLUDE_CHAR_EMBEDDING:
+			endLangEncoded.append(encodeCharsForward(endLangData, endLang))
+			endLangEncoded.append(encodeCharsBackward(endLangData, endLang))
+
+		x, y = getTrainingData(startLangEncoded, endLangEncoded)[dataSplitNumber]
 
 
 def sparseCrossEntropyLoss(targets=None, outputs=None):
@@ -138,12 +160,9 @@ def loadEncodedData(language):
 
 	return data
 	
-def getTrainingData(startLang, endLang):
-	inData = loadEncodedData(startLang)
-	outData = loadEncodedData(endLang)
-
-	inputData = inData + outData
-	outputData = outData[0]
+def getTrainingData(startLangData, endLangData):
+	inputData = startLangData + endLangData
+	outputData = endLangData[0]
 	outputData = np.pad(outputData,((0,0),(0,1)), mode='constant')[:,1:]
 	outputData = [np.expand_dims(outputData,axis=-1)]					#for sparse categorical
 	
@@ -163,12 +182,14 @@ def getTrainingData(startLang, endLang):
 	return (trainIn, trainOut), (valIn, valOut), (testIn, testOut)
 
 
-def trainModel(modelNum):
+def trainModel(modelNum, startLang="fr", endLang="en"):
 	#get model
 	trainingModel, _ = loadModel(modelNum)
 
 	# load all data
-	(xTrain, yTrain), (xVal, yVal), (_, _) = getTrainingData(startLang="fr", endLang="en")
+	startLangData = loadEncodedData(startLang)
+	endLangData = loadEncodedData(endLang)
+	(xTrain, yTrain), (xVal, yVal), (_, _) = getTrainingData(startLangData, endLangData)
 
 	# start training
 	initialEpoch = getLastEpoch(trainingModel.name)
