@@ -16,7 +16,9 @@ def writeProcessedData(fileName, data):
 		for line in data:
 			f.write(line + "\n")
 
-def readProcessedData(fileName, startPos=0, endPos=10**10):
+def readProcessedData(fileName, startPos=0, endPos=CONST.DATA_COUNT):
+	assert startPos < CONST.DATA_COUNT
+	assert endPos <= CONST.DATA_COUNT
 	with open(CONST.PROCESSED_DATA + fileName + ".txt") as f:
 		lines = [line for i, line in enumerate(f) if i >= startPos and i < endPos]
 
@@ -24,9 +26,9 @@ def readProcessedData(fileName, startPos=0, endPos=10**10):
 
 def lenProcessedData(fileName):
 	with open(CONST.PROCESSED_DATA + fileName + ".txt") as f:
-		for i, _ in enumerate(f):
+		for i, _ in enumerate(f, 1):
 			pass
-	return i+1
+	return min(i, CONST.DATA_COUNT)
 
 def readArchiveFile(fileName):
 	with gzip.open(fileName,"rb") as f:

@@ -141,6 +141,8 @@ def writeEncodingsData(encodeDataToNumpy=False):
 		writeEncodedData(en, "en")
 		print("encoding and encoded text saved to disk")
 	else:
+		FA.writeProcessedData(fr, "fr")
+		FA.writeProcessedData(en, "en")
 		print("cleaned text saved to disk, not encoded")
 	print(CONST.LAPSED_TIME())
 

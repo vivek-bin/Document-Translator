@@ -5,11 +5,13 @@ from keras import layers
 from keras.optimizers import Adam
 import json
 import keras.backend as K
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, TensorBoard
 import os
 from keras.utils import Sequence
+import time
 
 from . import constants as CONST
+from . import preparedata as PD
 from .models.models import *
 from .processing import fileaccess as FA
 
@@ -41,26 +43,88 @@ class DataPartitioningSequence(Sequence):
 		currentPartitionSize = min(self.partitionSize, len(self.x[0]) - self.partitionOffset)
 		print("Training on data from {0} to {1}".format(self.partitionOffset, self.partitionOffset + currentPartitionSize))
 
-	def loadData(self, dataSplitNumber):
-		partitionSize = int(np.ceil(len(self.x[0])/self.numPartitions))
-		partitionOffset = partitionSize * ((self.epoch-1) % self.numPartitions)
+class DataPartitionLoadingSequence(Sequence):
+	def __init__(self, startLang, endLang, batchSize, numPartitions, training=False, validation=False, testing=False, initialEpoch=0):
+		'''
+			training flag -> training data generator
+			validation flag -> validation data generator
+			testing flag -> testing data generator
+			**if multiple flags from these are set, the first True from the above order is considered**
+		'''
+		assert type(training) == bool
+		assert type(validation) == bool
+		assert type(testing) == bool
+		assert training or validation or testing
 
-		startLangData = FA.readProcessedData(startLang, partitionOffset, partitionOffset + partitionSize)
-		endLangData = FA.readProcessedData(endLang, partitionOffset, partitionOffset + partitionSize)
+		self.startLang = startLang
+		self.endLang = endLang
+		self.epoch = initialEpoch
+		self.batchSize = batchSize
+		self.numPartitions = numPartitions
+		self.partitionSize = int(np.ceil(FA.lenProcessedData(startLang)/self.numPartitions))
+
+		if training:
+			start = 0
+			end = CONST.TRAIN_SPLIT_PCT * (1 - CONST.VALIDATION_SPLIT_PCT)
+		elif validation:
+			start = CONST.TRAIN_SPLIT_PCT * (1 - CONST.VALIDATION_SPLIT_PCT)
+			end = CONST.TRAIN_SPLIT_PCT
+		elif testing:
+			start = CONST.TRAIN_SPLIT_PCT
+			end = 1
+		self.dataPartStart = int(start * self.partitionSize)
+		self.dataPartEnd = int(end * self.partitionSize)
+
+		self.startLangText = []
+		self.endLangText = []
+		self.loadData()
+
+	def __len__(self):
+		assert len(self.endLangText) == len(self.startLangText)
+		assert len(self.endLangText) > 0
+
+		return int(np.ceil(len(self.endLangText) / self.batchSize))
+
+	def __getitem__(self, idx):
+		assert len(self.endLangText) == len(self.startLangText)
+		assert len(self.endLangText) > 0
+
+		startLangBatchText = self.startLangText[idx * self.batchSize:idx * self.batchSize + self.batchSize]
+		endLangBatchText = self.endLangText[idx * self.batchSize:idx * self.batchSize + self.batchSize]
 
 		startLangEncoded = []
-		startLangEncoded.append(encodeWords(startLangData, startLang))
+		startLangEncoded.append(PD.encodeWords(startLangBatchText, self.startLang))
 		if CONST.INCLUDE_CHAR_EMBEDDING:
-			startLangEncoded.append(encodeCharsForward(startLangData, startLang))
-			startLangEncoded.append(encodeCharsBackward(startLangData, startLang))
+			startLangEncoded.append(PD.encodeCharsForward(startLangBatchText, self.startLang))
+			startLangEncoded.append(PD.encodeCharsBackward(startLangBatchText, self.startLang))
 
 		endLangEncoded = []
-		endLangEncoded.append(encodeWords(endLangData, endLang))
+		endLangEncoded.append(PD.encodeWords(endLangBatchText, self.endLang))
 		if CONST.INCLUDE_CHAR_EMBEDDING:
-			endLangEncoded.append(encodeCharsForward(endLangData, endLang))
-			endLangEncoded.append(encodeCharsBackward(endLangData, endLang))
+			endLangEncoded.append(PD.encodeCharsForward(endLangBatchText, self.endLang))
+			endLangEncoded.append(PD.encodeCharsBackward(endLangBatchText, self.endLang))
 
-		x, y = getTrainingData(startLangEncoded, endLangEncoded)[dataSplitNumber]
+		xBatch = startLangEncoded + endLangEncoded
+		yBatch = endLangEncoded[0]
+		yBatch = np.pad(yBatch,((0,0),(0,1)), mode='constant')[:,1:]
+		yBatch = [np.expand_dims(yBatch,axis=-1)]
+
+		return xBatch, yBatch
+
+	def on_epoch_end(self):
+		self.epoch += 1
+		self.loadData()
+
+	def loadData(self):
+		# load next data partition
+		partitionOffset = self.partitionSize * ((self.epoch-1) % self.numPartitions)
+
+		self.startLangText = FA.readProcessedData(self.startLang, partitionOffset + self.dataPartStart, partitionOffset + self.dataPartEnd)
+		self.endLangText = FA.readProcessedData(self.endLang, partitionOffset + self.dataPartStart, partitionOffset + self.dataPartEnd)
+		data = list(zip(self.startLangText, self.endLangText))
+		data.sort(key=lambda x:len(x[1]))
+		self.startLangText = [ls for ls, le in data]
+		self.endLangText = [le for ls, le in data]
 
 
 def sparseCrossEntropyLoss(targets=None, outputs=None):
@@ -160,7 +224,10 @@ def loadEncodedData(language):
 
 	return data
 	
-def getTrainingData(startLangData, endLangData):
+def getTrainingData(startLang, endLang):
+	startLangData = loadEncodedData(startLang)
+	endLangData = loadEncodedData(endLang)
+
 	inputData = startLangData + endLangData
 	outputData = endLangData[0]
 	outputData = np.pad(outputData,((0,0),(0,1)), mode='constant')[:,1:]
@@ -183,24 +250,26 @@ def getTrainingData(startLangData, endLangData):
 
 
 def trainModel(modelNum, startLang="fr", endLang="en"):
-	#get model
+	# get model
 	trainingModel, _ = loadModel(modelNum)
+	initialEpoch = getLastEpoch(trainingModel.name)
 
 	# load all data
-	startLangData = loadEncodedData(startLang)
-	endLangData = loadEncodedData(endLang)
-	(xTrain, yTrain), (xVal, yVal), (_, _) = getTrainingData(startLangData, endLangData)
+	# (xTrain, yTrain), (xVal, yVal), (_, _) = getTrainingData(startLang, endLang)
+	# trainingDataGenerator = DataPartitioningSequence(x=xTrain, y=yTrain, batchSize=CONST.BATCH_SIZE, numPartitions=CONST.DATA_PARTITIONS, initialEpoch=initialEpoch)
+	# validationDataGenerator = DataPartitioningSequence(x=xVal, y=yVal, batchSize=CONST.BATCH_SIZE, numPartitions=CONST.DATA_PARTITIONS, initialEpoch=initialEpoch)
+	trainingDataGenerator = DataPartitionLoadingSequence(training=True, startLang=startLang, endLang=endLang, batchSize=CONST.BATCH_SIZE, numPartitions=CONST.DATA_PARTITIONS, initialEpoch=initialEpoch)
+	validationDataGenerator = DataPartitionLoadingSequence(validation=True, startLang=startLang, endLang=endLang, batchSize=CONST.BATCH_SIZE, numPartitions=CONST.DATA_PARTITIONS, initialEpoch=initialEpoch)
 
-	# start training
-	initialEpoch = getLastEpoch(trainingModel.name)
+	# prepare callbacks
 	callbacks = []
 	callbacks.append(ModelCheckpoint(CONST.MODELS + trainingModel.name + CONST.MODEL_CHECKPOINT_NAME_SUFFIX, monitor=CONST.EVALUATION_METRIC, mode='max', save_best_only=True))
+	callbacks.append(TensorBoard(log_dir=CONST.LOGS + "tensorboard-log-{}".format(time.time()), histogram_freq=1, batch_size=CONST.BATCH_SIZE, write_graph=True, write_grads=True, write_images=True))
 
-	trainingDataGenerator = DataPartitioningSequence(x=xTrain, y=yTrain, batchSize=CONST.BATCH_SIZE, numPartitions=CONST.DATA_PARTITIONS, initialEpoch=initialEpoch)
-	validationDataGenerator = DataPartitioningSequence(x=xVal, y=yVal, batchSize=CONST.BATCH_SIZE, numPartitions=CONST.DATA_PARTITIONS, initialEpoch=initialEpoch)
+	# start training
 	_ = trainingModel.fit_generator(trainingDataGenerator, validation_data=validationDataGenerator, epochs=CONST.NUM_EPOCHS*CONST.DATA_PARTITIONS, callbacks=callbacks, initial_epoch=initialEpoch)
-	#_ = trainingModel.fit(x=xTrain, y=yTrain, epochs=CONST.NUM_EPOCHS, batch_size=CONST.BATCH_SIZE, validation_data=(xVal, yVal), callbacks=callbacks, initial_epoch=initialEpoch)
 
+	# save model after training
 	trainingModel.save(CONST.MODELS + trainingModel.name + CONST.MODEL_TRAINED_NAME_SUFFIX)
 
 
