@@ -227,7 +227,7 @@ class Translator:
 			stateIndices = bestPredictions // CONST.BEAM_SIZE
 			prevStates = [p[stateIndices] for p in prevStates]
 
-
+		print("sentence truncated!")
 		bestSentenceIndex = np.argmin(cumulativeScore)
 		outputString = self.prepareSentences(wordList=predictedWords[bestSentenceIndex].split(CONST.UNIT_SEP), originalText=cleanString[0], alphasList=alphasList[bestSentenceIndex])
 		return outputString
