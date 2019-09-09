@@ -4,3 +4,4 @@
 /venv/
 cmd.exe
 mainsrc.zip
+*.pyc
