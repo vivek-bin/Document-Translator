@@ -126,7 +126,7 @@ def futureMask():
 
 
 def readDictionaryPDF(bestWordOnly=True):
-	from src import constants as CONST
+	from translator import constants as CONST
 	from PyPDF2 import PdfFileReader
 
 	with open(CONST.DICTIONARY_PATH, "rb") as pdfFileBinary:
@@ -185,4 +185,29 @@ def lossFuncShiftPos():
 	print(K.eval(secondPositionShifter))
 	print(K.eval(relevantValues))
 
-lossFuncShiftPos()
+
+def sampleEncoded():
+	from translator import preparedata as PD
+	from translator.processing import fileaccess as FA
+	import numpy as np
+
+	text = FA.readProcessedData("en", 100000, 100000 + 100)
+	encText = PD.encodeWords(text, "en")
+
+	encLen = [len([y for y in x if y]) for x in encText]
+	encUnkLen = [len([y for y in x if y == 19894]) for x in encText]
+	encLenUnkLenPair = list(zip(encLen, encUnkLen))
+	uncRatio = [ul/l for l, ul in encLenUnkLenPair]
+	maxUnk = np.argmax(encUnkLen)
+	print(text[maxUnk][-1])
+	print(text[maxUnk])
+	print(encText[maxUnk])
+
+
+	# for x in encLenUnkLenPair:
+	# 	print(x)
+	print(sum(uncRatio)/len(uncRatio))
+
+
+
+sampleEncoded()

@@ -1,6 +1,7 @@
 from .. import constants as CONST
 import gzip
 import os
+from PyPDF2 import PdfFileReader
 
 MAX_WORDS = 60
 
@@ -19,13 +20,13 @@ def writeProcessedData(data, fileName):
 def readProcessedData(fileName, startPos=0, endPos=CONST.DATA_COUNT):
 	assert startPos < CONST.DATA_COUNT
 	assert endPos <= CONST.DATA_COUNT
-	with open(CONST.PROCESSED_DATA + fileName + ".txt") as f:
-		lines = [line for i, line in enumerate(f) if i >= startPos and i < endPos]
+	with open(CONST.PROCESSED_DATA + fileName + ".txt", encoding="utf8") as f:
+		lines = [line.strip() for i, line in enumerate(f) if i >= startPos and i < endPos]
 
 	return lines
 
 def lenProcessedData(fileName):
-	with open(CONST.PROCESSED_DATA + fileName + ".txt") as f:
+	with open(CONST.PROCESSED_DATA + fileName + ".txt", encoding="utf8") as f:
 		for i, _ in enumerate(f, 1):
 			pass
 	return min(i, CONST.DATA_COUNT)
@@ -81,9 +82,6 @@ def loadFraEng():
 	return fileFr, fileEn
 	
 def readDictionaryPDF(bestWordOnly=True):
-	from src import constants as CONST
-	from PyPDF2 import PdfFileReader
-
 	with open(CONST.DICTIONARY_PATH, "rb") as pdfFileBinary:
 		pdfFile = PdfFileReader(pdfFileBinary)
 		pageTexts = []

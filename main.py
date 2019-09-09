@@ -1,5 +1,5 @@
 import sys
-from src import constants as CONST
+from translator import constants as CONST
 
 VALID_FLAGS = ["--prep", "--train", "--translate"]
 
@@ -17,29 +17,33 @@ def main():
 			if flag not in VALID_FLAGS and flag not in ["1","2"]:
 				print("Invalid flag. Valid flags are "+", ".join(VALID_FLAGS))
 				return False
-		if "--prep" in flags:
+		if "--prep" == flags[0]:
 			prepareDataFlag = True
-		if "--train" in flags:
+		if "--train" == flags[0]:
 			trainModelFlag = True
 			try:
-				modelNum = int(flags[flags.index("--train")+1])
-			except (ValueError, IndexError):
+				modelNum = int(flags[1])
+			except IndexError:
 				modelNum = 1
 			
-		if "--translate" in flags:
+		if "--translate" == flags[0]:
 			translateFlag = True
+			try:
+				modelNum = int(flags[1])
+			except IndexError:
+				modelNum = 1
 
 	if prepareDataFlag:
-		from src.preparedata import writeEncodingsData
+		from translator.preparedata import writeEncodingsData
 		writeEncodingsData()
 
 	if trainModelFlag:
-		from src.trainmodel import trainModel
-		trainModel(modelNum)
+		from translator.trainmodel import trainModel
+		trainModel(modelNum=modelNum)
 
 	if translateFlag:
-		from src.translate import Translater
-		frToEngTranslater = Translater(startLang="fr",endLang="en")
+		from translator.translate import Translator
+		frToEngTranslater = Translator(startLang="fr", endLang="en", modelNum=modelNum)
 		print(CONST.LAPSED_TIME())
 		text = ["Ma question porte sur un sujet qui est à l'ordre du jour du jeudi et que je soulèverai donc une nouvelle fois."]
 		print(frToEngTranslater(text))

@@ -50,6 +50,8 @@ def cleanLine(line, language):
 
 def splitWordStem(word, language):
 	global STEMMER
+	if re.match(r".*?\d", word):
+		return [word]
 	wordStem = STEMMER[language](word)
 	if word.lower() == wordStem:
 		return [word]
@@ -160,6 +162,7 @@ def writeEncoding(encoding, name):
 	encoding.sort()
 	encoding.insert(0,CONST.MASK_TOKEN)
 	encoding.append(CONST.UNKNOWN_TOKEN)			# unknown 
+	encoding.append(CONST.ALPHANUM_UNKNOWN_TOKEN)	# alphanum unknown 
 	encoding.append(CONST.START_OF_SEQUENCE_TOKEN)	# start of sequence
 	encoding.append(CONST.END_OF_SEQUENCE_TOKEN)	# end of sequence
 
@@ -206,7 +209,8 @@ def encodeWords(data, language):
 			try:
 				encodedData[i][j+1] = encoding[word]
 			except KeyError:
-				encodedData[i][j+1] = encoding[CONST.UNKNOWN_TOKEN]
+				encodedData[i][j+1] = encoding[CONST.ALPHANUM_UNKNOWN_TOKEN] if re.match(r".*?\d", word) else encoding[CONST.UNKNOWN_TOKEN]
+				
 		encodedData[i][j+2] = encoding[CONST.END_OF_SEQUENCE_TOKEN]
 
 	return encodedData
