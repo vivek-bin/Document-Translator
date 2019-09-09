@@ -4,13 +4,11 @@ from keras import layers
 from .. import constants as CONST
 
 def sqrtScaleValues(x):
-	#from .. import constants as CONST
 	from keras import backend as K
 	scale = K.sqrt(K.cast(CONST.ATTENTION_UNITS, "float32"))
 	return x/scale
 
 def sqrtScaleHideFuture(x):
-	#from .. import constants as CONST
 	from keras import backend as K
 
 	m = K.arange(K.shape(x)[1])
@@ -19,9 +17,12 @@ def sqrtScaleHideFuture(x):
 	mask = K.cast(K.greater_equal(m2, m1), "float32")
 	mask = K.tile(K.expand_dims(mask, 0), [K.shape(x)[0], 1, 1])
 
+	lowValue = K.cast(K.less(m2, m1), "float32") * K.cast(-2**15, "float32")
+	lowValue = K.tile(K.expand_dims(lowValue, 0), [K.shape(x)[0], 1, 1])
+
 	scale = K.sqrt(K.cast(CONST.ATTENTION_UNITS, "float32"))
 
-	return (x * mask)/scale
+	return (x/scale) * mask + lowValue
 
 
 def dotAttentionFunc(inputs=[], hideFuture=False):

@@ -9,6 +9,7 @@ from keras.callbacks import ModelCheckpoint, TensorBoard
 import os
 from keras.utils import Sequence
 import time
+import h5py
 
 from . import constants as CONST
 from . import preparedata as PD
@@ -195,10 +196,12 @@ def loadModel(modelNum, loadForTraining=True):
 
 		if loadForTraining:
 			trainingModel.load_weights(CONST.MODELS + checkPointName)
-			tempModel = load_model(CONST.MODELS + checkPointName, custom_objects={"CONST": CONST, "sparseCrossEntropyLoss": sparseCrossEntropyLoss})
+			savedOptimizerStates = h5py.File(CONST.MODELS + checkPointName, mode="r")["optimizer_weights"]
+			optimizerWeightNames = [n.decode('utf8') for n in savedOptimizerStates.attrs['weight_names']]
+			optimizerWeightValues = [savedOptimizerStates[n] for n in optimizerWeightNames]
+
 			trainingModel._make_train_function()
-			weight_values = K.batch_get_value(getattr(tempModel.optimizer, 'weights'))
-			trainingModel.optimizer.set_weights(weight_values)
+			trainingModel.optimizer.set_weights(optimizerWeightValues)
 
 
 	return trainingModel, samplingModels
@@ -264,7 +267,7 @@ def trainModel(modelNum, startLang="fr", endLang="en"):
 	# prepare callbacks
 	callbacks = []
 	callbacks.append(ModelCheckpoint(CONST.MODELS + trainingModel.name + CONST.MODEL_CHECKPOINT_NAME_SUFFIX, monitor=CONST.EVALUATION_METRIC, mode='max', save_best_only=True))
-	callbacks.append(TensorBoard(log_dir=CONST.LOGS + "tensorboard-log-{}".format(time.time()), histogram_freq=1, batch_size=CONST.BATCH_SIZE, write_graph=True, write_grads=True, write_images=True))
+	callbacks.append(TensorBoard(log_dir=CONST.LOGS + "tensorboard-log-{}".format(time.time()), histogram_freq=0, batch_size=CONST.BATCH_SIZE))#, write_graph=True, write_grads=True, write_images=True))
 
 	# start training
 	_ = trainingModel.fit_generator(trainingDataGenerator, validation_data=validationDataGenerator, epochs=CONST.NUM_EPOCHS*CONST.DATA_PARTITIONS, callbacks=callbacks, initial_epoch=initialEpoch)
