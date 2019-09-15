@@ -4,11 +4,27 @@ from os.path import dirname
 from os.path import isdir
 from time import time, ctime
 import numpy as np
+import os
+import sys
 
 print(ctime().rjust(60,"-"))
 START_TIME = time()
 def LAPSED_TIME():
 	return "{:10.2f} seconds".format((time() - START_TIME)).rjust(60,"-")
+
+class HiddenPrints:
+    def __enter__(self):
+        self._original_stdout = sys.stdout
+        self._original_stderr = sys.stderr
+        sys.stdout = open(os.devnull, 'w')
+        sys.stderr = open(os.devnull, 'w')
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout.close()
+        sys.stderr.close()
+        sys.stdout = self._original_stdout
+        sys.stderr = self._original_stderr
+
 
 ###paths
 GOOGLE_DRIVE_PATH = "/content/drive/My Drive/"
@@ -49,7 +65,7 @@ PROCESSED_DATA = DATA + "processed input/"
 
 ###data parameters
 DATA_COUNT = int(10 * 1000 * 1000)
-DATA_PARTITIONS = 14
+DATA_PARTITIONS = 20
 
 UNIT_SEP = "\x1f"
 MASK_TOKEN = "MASK"
@@ -95,8 +111,8 @@ BATCH_SIZE = 64
 NUM_EPOCHS = 40
 VALIDATION_SPLIT_PCT = 0.1
 VALIDATION_SPLIT = int(VALIDATION_SPLIT_PCT * TRAIN_SPLIT)
-LEARNING_RATE = 0.001
-LEARNING_RATE_DECAY = 0.05
+LEARNING_RATE = 0.0005
+LEARNING_RATE_DECAY = 0.1
 LOSS_FUNCTION = "sparse_categorical_crossentropy"
 EVALUATION_METRIC = "sparse_categorical_accuracy"
 

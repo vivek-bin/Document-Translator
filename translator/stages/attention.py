@@ -46,17 +46,13 @@ def basicAttentionStage(inputSize=CONST.NUM_LSTM_UNITS):
 	query = layers.Input(batch_shape=(None,None,inputSize))
 	key = layers.Input(batch_shape=(None,None,inputSize))
 
-	queryNorm = query
-	keyNorm = key
-	queryNorm = layers.TimeDistributed(layers.BatchNormalization())(queryNorm)
-	keyNorm = layers.TimeDistributed(layers.BatchNormalization())(keyNorm)
-
 	#key query pair
-	queryAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS, activation=CONST.DENSE_ACTIVATION))(queryNorm)
-	keyAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS, activation=CONST.DENSE_ACTIVATION))(keyNorm)
+	queryAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS, activation=CONST.DENSE_ACTIVATION))(query)
+	keyAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS, activation=CONST.DENSE_ACTIVATION))(key)
 	
 	# attention!
-	[contextOut, alphas] = dotAttentionFunc([queryAttentionIn, keyAttentionIn, keyNorm])
+	[contextOut, alphas] = dotAttentionFunc([queryAttentionIn, keyAttentionIn, key])
+	contextOut = layers.TimeDistributed(layers.BatchNormalization())(contextOut)
 
 	attentionModel = Model(inputs=[query, key], outputs=[contextOut, alphas], name="attention_stage")
 	return attentionModel
@@ -66,19 +62,14 @@ def multiHeadAttentionStage(inputSize, h=CONST.NUM_ATTENTION_HEADS, count=0, hid
 	query = layers.Input(batch_shape=(None,None,inputSize))
 	key = layers.Input(batch_shape=(None,None,inputSize))
 
-	queryNorm = query
-	keyNorm = key
-	queryNorm = layers.TimeDistributed(layers.BatchNormalization())(queryNorm)
-	keyNorm = layers.TimeDistributed(layers.BatchNormalization())(keyNorm)
-
 	contextList = []
 	alphasList = []
 
 	for i in range(h):
 		#key query pair
-		queryAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS//h, activation=CONST.DENSE_ACTIVATION))(queryNorm)
-		keyAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS//h, activation=CONST.DENSE_ACTIVATION))(keyNorm)
-		valueAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS//h, activation=CONST.DENSE_ACTIVATION))(keyNorm)
+		queryAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS//h, activation=CONST.DENSE_ACTIVATION))(query)
+		keyAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS//h, activation=CONST.DENSE_ACTIVATION))(key)
+		valueAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS//h, activation=CONST.DENSE_ACTIVATION))(key)
 		
 		# attention!
 		[contextOut, alphas] = dotAttentionFunc([queryAttentionIn, keyAttentionIn, valueAttentionIn], hideFuture=hideFuture)
@@ -91,14 +82,15 @@ def multiHeadAttentionStage(inputSize, h=CONST.NUM_ATTENTION_HEADS, count=0, hid
 	contextOut = layers.Concatenate()(contextList)
 	contextOut = layers.TimeDistributed(layers.BatchNormalization())(contextOut)
 	contextOut = layers.TimeDistributed(layers.Dense(inputSize, activation=CONST.DENSE_ACTIVATION))(contextOut)
-	contextOut = layers.Add()([queryNorm, contextOut])
+	contextOut = layers.Add()([query, contextOut])
+	contextOut = layers.TimeDistributed(layers.BatchNormalization())(contextOut)
 
 	if feedForward:
-		contextOut = layers.TimeDistributed(layers.BatchNormalization())(contextOut)
 		contextOutFF = layers.TimeDistributed(layers.Dense(CONST.FEED_FORWARD_UNITS, activation=CONST.DENSE_ACTIVATION))(contextOut)
 		contextOutFF = layers.TimeDistributed(layers.BatchNormalization())(contextOutFF)
 		contextOutFF = layers.TimeDistributed(layers.Dense(inputSize, activation=CONST.DENSE_ACTIVATION))(contextOutFF)
 		contextOut = layers.Add()([contextOut, contextOutFF])
+		contextOut = layers.TimeDistributed(layers.BatchNormalization())(contextOut)
 
 	attentionModel = Model(inputs=[query, key], outputs=[contextOut, alphas], name="multihead_attention_stage_"+str(count))
 	return attentionModel

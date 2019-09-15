@@ -209,5 +209,12 @@ def sampleEncoded():
 	print(sum(uncRatio)/len(uncRatio))
 
 
+def visualizeModel():
+	from translator import constants as CONST
+	with CONST.HiddenPrints():
+		from translator import trainmodel as TM
+	TM.visualizeModel(1)
+	TM.visualizeModel(2)
 
-sampleEncoded()
+
+visualizeModel()

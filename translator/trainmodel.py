@@ -191,13 +191,11 @@ def loadModel(modelNum, loadForTraining=True):
 	#load checkpoint if available
 	checkPointName = getLastCheckpoint(trainingModel.name)
 	if checkPointName:
-		samplingModels[0].load_weights(CONST.MODELS + checkPointName)
-		samplingModels[1].load_weights(CONST.MODELS + checkPointName, by_name=True)
+		trainingModel.load_weights(CONST.MODELS + checkPointName)
 
 		if loadForTraining:
-			trainingModel.load_weights(CONST.MODELS + checkPointName)
 			savedOptimizerStates = h5py.File(CONST.MODELS + checkPointName, mode="r")["optimizer_weights"]
-			optimizerWeightNames = [n.decode('utf8') for n in savedOptimizerStates.attrs['weight_names']]
+			optimizerWeightNames = [n.decode("utf8") for n in savedOptimizerStates.attrs["weight_names"]]
 			optimizerWeightValues = [savedOptimizerStates[n] for n in optimizerWeightNames]
 
 			trainingModel._make_train_function()
@@ -275,6 +273,32 @@ def trainModel(modelNum, startLang="fr", endLang="en"):
 	# save model after training
 	trainingModel.save(CONST.MODELS + trainingModel.name + CONST.MODEL_TRAINED_NAME_SUFFIX)
 
+def visualizeModel(modelNum):
+	with CONST.HiddenPrints():
+		trainingModel, samplingModels = loadModel(modelNum)
+
+	def loadLayerDict(model, l):
+		for layer in model.layers:
+			if layer.__class__ is Model:
+				loadLayerDict(layer, l)
+			else:
+				w = layer.get_weights()
+				if w:
+					l[layer.name] = w
+	print(CONST.LAPSED_TIME())
+	trLayerWeights = {}
+	loadLayerDict(trainingModel, trLayerWeights)
+	s1LayerWeights = {}
+	loadLayerDict(samplingModels[0], s1LayerWeights)
+
+
+	for k,v in trLayerWeights.items():
+		print("{} : {}".format(k, len(v)))
+		print("     " + "\t".join([str(vl.shape) for vl in v]))
+	
+	print(trLayerWeights["embedding_2"])
+	print(s1LayerWeights["embedding_2"])
+	print(CONST.LAPSED_TIME())
 
 
 def main():
