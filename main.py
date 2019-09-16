@@ -39,7 +39,7 @@ def main():
 
 	if trainModelFlag:
 		from translator.trainmodel import trainModel
-		trainModel(modelNum=modelNum)
+		trainModel(startLang="fr", endLang="en", modelNum=modelNum)
 
 	if translateFlag:
 		from translator.translate import Translator

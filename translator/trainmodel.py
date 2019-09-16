@@ -253,6 +253,7 @@ def getTrainingData(startLang, endLang):
 def trainModel(modelNum, startLang="fr", endLang="en"):
 	# get model
 	trainingModel, _ = loadModel(modelNum)
+	trainingModel.name = trainingModel.name + "-{}-to-{}".format(startLang, endLang)
 	initialEpoch = getLastEpoch(trainingModel.name)
 
 	# load all data
