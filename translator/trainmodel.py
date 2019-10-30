@@ -256,20 +256,21 @@ def trainModel(modelNum, startLang="fr", endLang="en"):
 	trainingModel.name = trainingModel.name + "-{}-to-{}".format(startLang, endLang)
 	initialEpoch = getLastEpoch(trainingModel.name)
 
-	# load all data
-	# (xTrain, yTrain), (xVal, yVal), (_, _) = getTrainingData(startLang, endLang)
-	# trainingDataGenerator = DataPartitioningSequence(x=xTrain, y=yTrain, batchSize=CONST.BATCH_SIZE, numPartitions=CONST.DATA_PARTITIONS, initialEpoch=initialEpoch)
-	# validationDataGenerator = DataPartitioningSequence(x=xVal, y=yVal, batchSize=CONST.BATCH_SIZE, numPartitions=CONST.DATA_PARTITIONS, initialEpoch=initialEpoch)
+	# prepare data generators
 	trainingDataGenerator = DataPartitionLoadingSequence(training=True, startLang=startLang, endLang=endLang, batchSize=CONST.BATCH_SIZE, numPartitions=CONST.DATA_PARTITIONS, initialEpoch=initialEpoch)
 	validationDataGenerator = DataPartitionLoadingSequence(validation=True, startLang=startLang, endLang=endLang, batchSize=CONST.BATCH_SIZE, numPartitions=CONST.DATA_PARTITIONS, initialEpoch=initialEpoch)
-
+	# temporary data gen to get first partition validation data as a whole(batch size=partition size)
+	temporaryDataGenerator = DataPartitionLoadingSequence(validation=True, startLang=startLang, endLang=endLang, batchSize=trainingDataGenerator.partitionSize, numPartitions=CONST.DATA_PARTITIONS, initialEpoch=1)
+	
 	# prepare callbacks
 	callbacks = []
 	callbacks.append(ModelCheckpoint(CONST.MODELS + trainingModel.name + CONST.MODEL_CHECKPOINT_NAME_SUFFIX, monitor=CONST.EVALUATION_METRIC, mode='max', save_best_only=True))
-	callbacks.append(TensorBoard(log_dir=CONST.LOGS + "tensorboard-log-{}".format(time.time()), histogram_freq=0, batch_size=CONST.BATCH_SIZE))#, write_graph=True, write_grads=True, write_images=True))
+	callbacks.append(TensorBoard(log_dir=CONST.LOGS + "tensorboard-log", histogram_freq=1, batch_size=CONST.BATCH_SIZE, write_graph=True, write_grads=True, write_images=True))
 
 	# start training
-	_ = trainingModel.fit_generator(trainingDataGenerator, validation_data=validationDataGenerator, epochs=CONST.NUM_EPOCHS*CONST.DATA_PARTITIONS, callbacks=callbacks, initial_epoch=initialEpoch)
+	#_ = trainingModel.fit_generator(trainingDataGenerator, validation_data=validationDataGenerator, epochs=CONST.NUM_EPOCHS*CONST.DATA_PARTITIONS, callbacks=callbacks, initial_epoch=initialEpoch)
+	# train with first partition validation data throughout
+	_ = trainingModel.fit_generator(trainingDataGenerator, validation_data=temporaryDataGenerator[0], epochs=CONST.NUM_EPOCHS*CONST.DATA_PARTITIONS, callbacks=callbacks, initial_epoch=initialEpoch)
 
 	# save model after training
 	trainingModel.save(CONST.MODELS + trainingModel.name + CONST.MODEL_TRAINED_NAME_SUFFIX)
