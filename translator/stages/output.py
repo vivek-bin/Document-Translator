@@ -4,14 +4,14 @@ from keras import layers
 from .. import constants as CONST
 
 
-def recurrentOutputStage(outputVocabularySize, contextSize, name=""):
-	decoderEmbedding = layers.Input(batch_shape=(None,None,CONST.EMBEDDING_SIZE))
-	decoderOut = layers.Input(batch_shape=(None,None,contextSize))
-	contextOut = layers.Input(batch_shape=(None,None,contextSize))
+def recurrentOutputStage(outputVocabularySize, name=""):
+	decoderEmbedding = layers.Input(batch_shape=(None,None,CONST.MODEL_BASE_UNITS))
+	decoderOut = layers.Input(batch_shape=(None,None,CONST.MODEL_BASE_UNITS))
+	contextOut = layers.Input(batch_shape=(None,None,CONST.MODEL_BASE_UNITS))
 	
-	decoderOutFinal = layers.TimeDistributed(layers.Dense(CONST.EMBEDDING_SIZE, activation=CONST.DENSE_ACTIVATION))(decoderOut)
-	contextFinal = layers.TimeDistributed(layers.Dense(CONST.EMBEDDING_SIZE, activation=CONST.DENSE_ACTIVATION))(contextOut)
-	prevWordFinal = layers.TimeDistributed(layers.Dense(CONST.EMBEDDING_SIZE, activation=CONST.DENSE_ACTIVATION))(decoderEmbedding)
+	decoderOutFinal = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION))(decoderOut)
+	contextFinal = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION))(contextOut)
+	prevWordFinal = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION))(decoderEmbedding)
 
 	#combine
 	wordOut = layers.Add()([contextFinal, decoderOutFinal, prevWordFinal])
@@ -26,11 +26,13 @@ def recurrentOutputStage(outputVocabularySize, contextSize, name=""):
 	return outputStage
 
 
-def simpleOutputStage(outputVocabularySize, contextSize, name=""):
-	contextOut = layers.Input(batch_shape=(None,None,contextSize))
+def simpleOutputStage(outputVocabularySize, name=""):
+	contextOut = layers.Input(batch_shape=(None,None,CONST.MODEL_BASE_UNITS))
 
 	contextFinal = layers.TimeDistributed(layers.Dense(CONST.EMBEDDING_SIZE, activation=CONST.DENSE_ACTIVATION))(contextOut)
 	contextFinal = layers.TimeDistributed(layers.BatchNormalization())(contextFinal)
+
+	#word prediction
 	wordOut = layers.TimeDistributed(layers.Dense(outputVocabularySize, activation="softmax"))(contextFinal)
 
 	outputStage = Model(inputs=[contextOut], outputs=[wordOut], name="output"+name)

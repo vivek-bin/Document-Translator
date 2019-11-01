@@ -25,6 +25,11 @@ def embeddingStage(VOCABULARY_COUNT, name, addPositionalEmbedding=False):
 		embedding = layers.Add()([embedding, positionEmbedding])
 
 	embedding = layers.TimeDistributed(layers.BatchNormalization())(embedding)
+	
+	#interface with the rest of the model
+	embedding = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION))(embedding)
+	embedding = layers.TimeDistributed(layers.BatchNormalization())(embedding)
+	
 	embeddingModel = Model(inputs=[wordInput], outputs=[embedding], name="embedding_"+name)
 	return embeddingModel
 
@@ -45,6 +50,11 @@ def wordCharEmbeddingStage(VOCABULARY_COUNT, CHAR_VOCABULARY_COUNT, name, addPos
 		embedding = layers.Add()([embedding, positionEmbedding])
 
 	embedding = layers.TimeDistributed(layers.BatchNormalization())(embedding)
+	
+	#interface with the rest of the model
+	embedding = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION))(embedding)
+	embedding = layers.TimeDistributed(layers.BatchNormalization())(embedding)
+	
 	embeddingModel = Model(inputs=[wordInput, charInput], outputs=[embedding], name="embedding_"+name)
 	return embeddingModel
 

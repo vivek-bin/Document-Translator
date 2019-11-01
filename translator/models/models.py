@@ -50,10 +50,14 @@ def translationLSTMAttModel():
 	encoderStates = []
 	encoderOut = encoderEmbedding
 	for _ in range(CONST.DECODER_ENCODER_DEPTH):
-		encoderLSTM = layers.Bidirectional(layers.LSTM(CONST.NUM_LSTM_UNITS//2, return_sequences=True, return_state=True, activation=CONST.LSTM_ACTIVATION))
+		encoderLSTM = layers.Bidirectional(layers.LSTM(CONST.MODEL_BASE_UNITS//2, return_sequences=True, return_state=True, activation=CONST.LSTM_ACTIVATION, recurrent_activation=CONST.LSTM_RECURRENT_ACTIVATION))
 		encoderBatchNorm = layers.TimeDistributed(layers.BatchNormalization())
-
-		encoderOut, forwardH, forwardC, backwardH, backwardC = encoderLSTM(encoderOut)
+    
+		encoderOutNext, forwardH, forwardC, backwardH, backwardC = encoderLSTM(encoderOut)
+		if CONST.RECURRENT_LAYER_RESIDUALS:
+			encoderOut = layers.Add()([encoderOut, encoderOutNext])
+		else:
+			encoderOut = encoderOutNext
 		encoderOut = encoderBatchNorm(encoderOut)
 
 		encoderStates.append(layers.Concatenate()([forwardH, backwardH]))
@@ -65,11 +69,15 @@ def translationLSTMAttModel():
 	decoderLSTM_SHARED = []
 	decoderBatchNorm_SHARED = []
 	for i in range(CONST.DECODER_ENCODER_DEPTH):
-		decoderLSTM_SHARED.append(layers.LSTM(CONST.NUM_LSTM_UNITS, return_sequences=True, return_state=True, activation=CONST.LSTM_ACTIVATION))
+		decoderLSTM_SHARED.append(layers.LSTM(CONST.MODEL_BASE_UNITS, return_sequences=True, return_state=True, activation=CONST.LSTM_ACTIVATION, recurrent_activation=CONST.LSTM_RECURRENT_ACTIVATION))
 		decoderBatchNorm_SHARED.append(layers.TimeDistributed(layers.BatchNormalization()))
 
 		initialState = encoderStates[i*2:(i+1)*2]
-		decoderOut, forwardH, forwardC = decoderLSTM_SHARED[i]([decoderOut] + initialState)
+		decoderOutNext, forwardH, forwardC = decoderLSTM_SHARED[i]([decoderOut] + initialState)
+		if CONST.RECURRENT_LAYER_RESIDUALS:
+			decoderOut = layers.Add()([decoderOut, decoderOutNext])
+		else:
+			decoderOut = decoderOutNext
 		decoderOut = decoderBatchNorm_SHARED[i](decoderOut)
 
 		decoderStates.append(forwardH)
@@ -77,11 +85,11 @@ def translationLSTMAttModel():
 		
 
 	######ATTENTION STAGE
-	attentionLayer_SHARED = multiHeadAttentionStage(CONST.NUM_LSTM_UNITS)
+	attentionLayer_SHARED = multiHeadAttentionStage()
 	[contextOut, alphas] = attentionLayer_SHARED([decoderOut, encoderOut])
 	
 	######FINAL PREDICTION STAGE
-	outputStage_SHARED = recurrentOutputStage(OUTPUT_VOCABULARY_COUNT, CONST.NUM_LSTM_UNITS)
+	outputStage_SHARED = recurrentOutputStage(OUTPUT_VOCABULARY_COUNT)
 	wordOut = outputStage_SHARED([contextOut, decoderOut, decoderEmbedding])
 
 	trainingModel = Model(inputs=encoderInput + decoderInput, outputs=wordOut, name="AttLSTM")
@@ -96,18 +104,22 @@ def translationLSTMAttModel():
 
 	###########
 	#next steps prediction model
-	preprocessedEncoder = layers.Input(batch_shape=(None, None, CONST.NUM_LSTM_UNITS))
+	preprocessedEncoder = layers.Input(batch_shape=(None, None, CONST.MODEL_BASE_UNITS))
 	previousStates = []
 	for _ in range(CONST.DECODER_ENCODER_DEPTH):
-		previousStates.append(layers.Input(batch_shape=(None, CONST.NUM_LSTM_UNITS)))			#H
-		previousStates.append(layers.Input(batch_shape=(None, CONST.NUM_LSTM_UNITS)))			#C
+		previousStates.append(layers.Input(batch_shape=(None, CONST.MODEL_BASE_UNITS)))			#H
+		previousStates.append(layers.Input(batch_shape=(None, CONST.MODEL_BASE_UNITS)))			#C
 
 	#shared decoder
 	decoderStates = []
 	decoderOut = decoderEmbedding
 	for _ in range(CONST.DECODER_ENCODER_DEPTH):
 		initialState = previousStates[i*2:(i+1)*2]
-		decoderOut, forwardH, forwardC = decoderLSTM_SHARED[i]([decoderOut] + initialState)
+		decoderOutNext, forwardH, forwardC = decoderLSTM_SHARED[i]([decoderOut] + initialState)
+		if CONST.RECURRENT_LAYER_RESIDUALS:
+			decoderOut = layers.Add()([decoderOut, decoderOutNext])
+		else:
+			decoderOut = decoderOutNext
 		decoderOut = decoderBatchNorm_SHARED[i](decoderOut)
 
 		decoderStates.append(forwardH)
@@ -155,7 +167,7 @@ def translationTransformerModel():
 	######ATTENTION STAGE
 	encoderContext = encoderEmbedding
 	for i in range(CONST.ENCODER_ATTENTION_STAGES):
-		encoderSelfAttentionLayer = multiHeadAttentionStage(CONST.EMBEDDING_SIZE, count=i)
+		encoderSelfAttentionLayer = multiHeadAttentionStage(count=i)
 		[encoderContext, _] = encoderSelfAttentionLayer([encoderContext, encoderContext])
 
 
@@ -178,16 +190,16 @@ def translationTransformerModel():
 	decoderSelfAttentionLayer_SHARED = []
 	decoderEncoderAttentionLayer_SHARED = []
 	for i in range(CONST.DECODER_ATTENTION_STAGES):
-		decoderSelfAttentionLayer_SHARED.append(multiHeadAttentionStage(CONST.EMBEDDING_SIZE, hideFuture=True, count=CONST.ENCODER_ATTENTION_STAGES + i*2, feedForward=False))
+		decoderSelfAttentionLayer_SHARED.append(multiHeadAttentionStage(hideFuture=True, count=CONST.ENCODER_ATTENTION_STAGES + i*2, feedForward=False))
 		[decoderContext, _] = decoderSelfAttentionLayer_SHARED[-1]([decoderContext, decoderContext])
 
-		decoderEncoderAttentionLayer_SHARED.append(multiHeadAttentionStage(CONST.EMBEDDING_SIZE, count=CONST.ENCODER_ATTENTION_STAGES + i*2 + 1))
+		decoderEncoderAttentionLayer_SHARED.append(multiHeadAttentionStage(count=CONST.ENCODER_ATTENTION_STAGES + i*2 + 1))
 		[decoderContext, alphas] = decoderEncoderAttentionLayer_SHARED[-1]([decoderContext, encoderContext])
 		alphasList.append(alphas)
 	alphas = layers.Average()(alphasList)
 	
 	######OUTPUT/PREDICTION STAGE
-	outputStage_SHARED = simpleOutputStage(OUTPUT_VOCABULARY_COUNT, CONST.EMBEDDING_SIZE)
+	outputStage_SHARED = simpleOutputStage(OUTPUT_VOCABULARY_COUNT)
 	wordOut = outputStage_SHARED(decoderContext)
 
 	trainingModel = Model(inputs=encoderInput + decoderInput, outputs=wordOut, name="Transformer")
@@ -203,7 +215,7 @@ def translationTransformerModel():
 
 	###########
 	#next steps prediction model
-	preprocessedEncoder = layers.Input(batch_shape=(None, None, CONST.EMBEDDING_SIZE))
+	preprocessedEncoder = layers.Input(batch_shape=(None, None, CONST.MODEL_BASE_UNITS))
 
 	decoderContext = decoderEmbedding
 	alphasList = []
