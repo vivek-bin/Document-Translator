@@ -217,4 +217,23 @@ def visualizeModel():
 	TM.visualizeModel(2)
 
 
-visualizeModel()
+def shiftMat(inputSize=8, outputSize=8, connectionSize=3, stepSize=1):
+	from keras import backend as K
+
+	weights = K.reshape(K.arange(1, connectionSize*outputSize+1, dtype="float32"), shape=(connectionSize, outputSize))
+	
+	padding = K.zeros(shape=(inputSize - connectionSize + stepSize, outputSize), dtype="float32")
+
+	weightsPad = K.concatenate([weights, padding], axis=0)
+	weightsPad = K.permute_dimensions(weightsPad,(1,0))
+	weightsPad = K.reshape(weightsPad, shape=(-1, outputSize))
+	weightsPad = K.permute_dimensions(weightsPad,(1,0))
+
+	print(weights.shape)
+	print(padding.shape)
+	print(weightsPad.shape)
+	
+	print(K.eval(weightsPad))
+
+shiftMat()
+

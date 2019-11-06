@@ -69,7 +69,7 @@ def multiHeadAttentionStage(count=0, hideFuture=False, feedForward=True):
 		#key query pair
 		queryAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS//CONST.NUM_ATTENTION_HEADS, activation=CONST.DENSE_ACTIVATION))(query)
 		keyAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS//CONST.NUM_ATTENTION_HEADS, activation=CONST.DENSE_ACTIVATION))(key)
-		valueAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS//CONST.NUM_ATTENTION_HEADS, activation=CONST.DENSE_ACTIVATION))(key)
+		valueAttentionIn = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS//CONST.NUM_ATTENTION_HEADS, activation=CONST.DENSE_ACTIVATION))(key)
 		
 		# attention!
 		[contextOut, alphas] = dotAttentionFunc([queryAttentionIn, keyAttentionIn, valueAttentionIn], hideFuture=hideFuture)
@@ -80,8 +80,6 @@ def multiHeadAttentionStage(count=0, hideFuture=False, feedForward=True):
 	alphas = layers.Average()(alphasList)
 
 	contextOut = layers.Concatenate()(contextList)
-	contextOut = layers.TimeDistributed(layers.BatchNormalization())(contextOut)
-	contextOut = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION))(contextOut)
 	contextOut = layers.Add()([query, contextOut])
 	contextOut = layers.TimeDistributed(layers.BatchNormalization())(contextOut)
 
