@@ -136,11 +136,20 @@ def sparseCrossEntropyLoss(targets=None, outputs=None):
 	secondPositionShifter = K.repeat(K.expand_dims(K.arange(batchSize) * sequenceSize * vocabularySize, 1), sequenceSize)
 
 	shiftedtargets = K.cast(K.flatten(targets), "int32") + K.flatten(firstPositionShifter) + K.flatten(secondPositionShifter)
-
-	relevantValues = K.gather(K.flatten(outputs), shiftedtargets)
-	relevantValues = K.reshape(relevantValues, (batchSize, -1))
-	relevantValues = K.clip(relevantValues, K.epsilon(), 1. - K.epsilon())
-	cost = -K.sum(K.log(relevantValues), axis=-1) / K.cast(K.shape(relevantValues)[1], "float32")				# sum the cross entropy for all words in the sequence
+	if CONST.LABEL_SMOOTHENING:
+		outputs = K.clip(outputs, K.epsilon(), 1. - K.epsilon())
+		outputs = -K.log(outputs)
+		relevantValues = K.gather(K.flatten(outputs), shiftedtargets)
+		relevantValues = K.reshape(relevantValues, (batchSize, -1))
+		otherValues = K.sum(outputs, axis=-1) - relevantValues
+		trueValue = (1. * CONST.LABEL_SMOOTHENING) + ((1.-CONST.LABEL_SMOOTHENING)/K.cast(vocabularySize,dtype="float32"))
+		falseValue = (0. * CONST.LABEL_SMOOTHENING) + ((1.-CONST.LABEL_SMOOTHENING)/K.cast(vocabularySize,dtype="float32"))
+		cost = relevantValues*trueValue + otherValues*falseValue
+	else:
+		relevantValues = K.gather(K.flatten(outputs), shiftedtargets)
+		relevantValues = K.reshape(relevantValues, (batchSize, -1))
+		relevantValues = K.clip(relevantValues, K.epsilon(), 1. - K.epsilon())
+		cost = -K.log(relevantValues)
 	return cost
 
 
@@ -218,10 +227,8 @@ def loadEncodedData(language):
 	if CONST.INCLUDE_CHAR_EMBEDDING:
 		charForwardData = charForwardData[:CONST.DATA_COUNT].copy()
 		charBackwardData = charBackwardData[:CONST.DATA_COUNT].copy()
-
-		charData = np.concatenate((charForwardData, charBackwardData), axis=2)
-		charData = np.reshape(charData, (charData.shape[0], -1))
-		data.append(charData)
+		data.append(charForwardData)
+		data.append(charBackwardData)
 
 	return data
 	

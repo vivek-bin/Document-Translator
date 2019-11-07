@@ -26,8 +26,10 @@ def translationLSTMAttModel():
 	encoderWordInput = layers.Input(batch_shape=(None, None))
 	encoderInput = [encoderWordInput]
 	if CONST.INCLUDE_CHAR_EMBEDDING:
-		encoderCharInput = layers.Input(batch_shape=(None, None))		# forward and backwards
-		encoderInput.append(encoderCharInput)
+		encoderCharForwardInput = layers.Input(batch_shape=(None, None, None))
+		encoderCharBackwardInput = layers.Input(batch_shape=(None, None, None))
+		encoderInput.append(encoderCharForwardInput)
+		encoderInput.append(encoderCharBackwardInput)
 		encoderEmbedding_SHARED = wordCharEmbeddingStage(INPUT_VOCABULARY_COUNT, INPUT_CHAR_VOCABULARY_COUNT, name="encoder")
 	else:
 		encoderEmbedding_SHARED = embeddingStage(INPUT_VOCABULARY_COUNT, name="encoder")
@@ -38,8 +40,10 @@ def translationLSTMAttModel():
 	decoderWordInput = layers.Input(batch_shape=(None, None))
 	decoderInput = [decoderWordInput]
 	if CONST.INCLUDE_CHAR_EMBEDDING:
-		decoderCharInput = layers.Input(batch_shape=(None, None))		# forward and backwards
-		decoderInput.append(decoderCharInput)
+		decoderCharForwardInput = layers.Input(batch_shape=(None, None, None))
+		decoderCharBackwardInput = layers.Input(batch_shape=(None, None, None))
+		decoderInput.append(decoderCharForwardInput)
+		decoderInput.append(decoderCharBackwardInput)
 		decoderEmbedding_SHARED = wordCharEmbeddingStage(OUTPUT_VOCABULARY_COUNT, OUTPUT_CHAR_VOCABULARY_COUNT, name="decoder")
 	else:
 		decoderEmbedding_SHARED = embeddingStage(OUTPUT_VOCABULARY_COUNT, name="decoder")
@@ -156,8 +160,10 @@ def translationTransformerModel():
 	encoderWordInput = layers.Input(batch_shape=(None, None))
 	encoderInput = [encoderWordInput]
 	if CONST.INCLUDE_CHAR_EMBEDDING:
-		encoderCharInput = layers.Input(batch_shape=(None, None))		# forward and backwards
-		encoderInput.append(encoderCharInput)
+		encoderCharForwardInput = layers.Input(batch_shape=(None, None, None))
+		encoderCharBackwardInput = layers.Input(batch_shape=(None, None, None))
+		encoderInput.append(encoderCharForwardInput)
+		encoderInput.append(encoderCharBackwardInput)
 		encoderEmbedding_SHARED = wordCharEmbeddingStage(INPUT_VOCABULARY_COUNT, INPUT_CHAR_VOCABULARY_COUNT, name="encoder", addPositionalEmbedding=True)
 	else:
 		encoderEmbedding_SHARED = embeddingStage(INPUT_VOCABULARY_COUNT, name="encoder", addPositionalEmbedding=True)
@@ -176,8 +182,10 @@ def translationTransformerModel():
 	decoderWordInput = layers.Input(batch_shape=(None, None))
 	decoderInput = [decoderWordInput]
 	if CONST.INCLUDE_CHAR_EMBEDDING:
-		decoderCharInput = layers.Input(batch_shape=(None, None))		# forward and backwards
-		decoderInput.append(decoderCharInput)
+		decoderCharForwardInput = layers.Input(batch_shape=(None, None, None))
+		decoderCharBackwardInput = layers.Input(batch_shape=(None, None, None))
+		decoderInput.append(decoderCharForwardInput)
+		decoderInput.append(decoderCharBackwardInput)
 		decoderEmbedding_SHARED = wordCharEmbeddingStage(OUTPUT_VOCABULARY_COUNT, OUTPUT_CHAR_VOCABULARY_COUNT, name="decoder", addPositionalEmbedding=True)
 	else:
 		decoderEmbedding_SHARED = embeddingStage(OUTPUT_VOCABULARY_COUNT, name="decoder", addPositionalEmbedding=True)

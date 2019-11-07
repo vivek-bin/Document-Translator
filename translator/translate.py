@@ -36,9 +36,8 @@ class Translator:
 		if CONST.INCLUDE_CHAR_EMBEDDING:
 			charForwardData = PD.encodeCharsForward(data, language)
 			charBackwardData = PD.encodeCharsBackward(data, language)
-			charData = np.concatenate((charForwardData, charBackwardData), axis=2)
-			charData = np.reshape(charData, (charData.shape[0], -1))
-			data.append(charData)
+			data.append(charForwardData)
+			data.append(charBackwardData)
 
 		return data
 

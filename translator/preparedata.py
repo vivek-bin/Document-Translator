@@ -207,22 +207,22 @@ def encodeWords(data, language):
 		encodedData[i][0] = encoding[CONST.START_OF_SEQUENCE_TOKEN]
 		for j,word in enumerate(line.lower().split(CONST.UNIT_SEP)):
 			try:
-				encodedData[i][j+1] = encoding[word]
+				encodedData[i,j+1] = encoding[word]
 			except KeyError:
-				encodedData[i][j+1] = encoding[CONST.ALPHANUM_UNKNOWN_TOKEN] if re.match(r".*?\d", word) else encoding[CONST.UNKNOWN_TOKEN]
+				encodedData[i,j+1] = encoding[CONST.ALPHANUM_UNKNOWN_TOKEN] if re.match(r".*?\d", word) else encoding[CONST.UNKNOWN_TOKEN]
 				
 		encodedData[i][j+2] = encoding[CONST.END_OF_SEQUENCE_TOKEN]
 
 	return encodedData
 
 def encodeCharsForward(data, language):
-	data = [CONST.UNIT_SEP.join([word[:CONST.CHAR_INPUT_SIZE] for word in line.split(CONST.UNIT_SEP)]) for line in data]
+	data = [CONST.UNIT_SEP.join([word[:CONST.CHAR_INPUT_SIZE] for word in line.lower().split(CONST.UNIT_SEP)]) for line in data]
 	encodedData = encodeChars(data, language)
 	
 	return encodedData
 
 def encodeCharsBackward(data, language):
-	data = [CONST.UNIT_SEP.join([word[:-CONST.CHAR_INPUT_SIZE-1:-1] for word in line.split(CONST.UNIT_SEP)]) for line in data]
+	data = [CONST.UNIT_SEP.join([word[:-CONST.CHAR_INPUT_SIZE-1:-1] for word in line.lower().split(CONST.UNIT_SEP)]) for line in data]
 	encodedData = encodeChars(data, language)
 	
 	return encodedData
@@ -235,12 +235,15 @@ def encodeChars(data, language):
 		encoding = {ch:i for i,ch in enumerate(json.load(f))}
 
 	for i,line in enumerate(data):
-		for j,word in enumerate(line.lower().split(CONST.UNIT_SEP)):
+		for j,word in enumerate(line.split(CONST.UNIT_SEP)):
 			for k,ch in enumerate(word):
 				try:
-					encodedData[i][j+1][k] = encoding[ch]
+					encodedData[i,j+1,k] = encoding[ch]
 				except KeyError:
-					encodedData[i][j+1][k] = encoding[CONST.UNKNOWN_TOKEN]
+					encodedData[i,j+1,k] = encoding[CONST.UNKNOWN_TOKEN]
+				except IndexError:
+					print(line, word, encoding[ch], ch, i, j, k)
+					raise IndexError
 
 	return encodedData
 
