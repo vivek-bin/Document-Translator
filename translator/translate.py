@@ -32,14 +32,14 @@ class Translator:
 
 	def encodeData(self, data, language):
 		wordData = PD.encodeWords(data, language)
-		data = [wordData]
+		encodedData = [wordData]
 		if CONST.INCLUDE_CHAR_EMBEDDING:
 			charForwardData = PD.encodeCharsForward(data, language)
 			charBackwardData = PD.encodeCharsBackward(data, language)
-			data.append(charForwardData)
-			data.append(charBackwardData)
+			encodedData.append(charForwardData)
+			encodedData.append(charBackwardData)
 
-		return data
+		return encodedData
 
 
 	def encoderEncodeData(self, inputString, mergeUnk=False):
@@ -114,14 +114,17 @@ class Translator:
 
 		outputString = ""
 		addSpace = False
-		wordPrev = capitalizeFirstLetter(wordList[0])
-		for i, wordPart in enumerate(wordList[1:], 1):
+		predictionList = wordList.split(CONST.UNIT_SEP)
+		wordPrev = capitalizeFirstLetter(predictionList[0])
+
+		for i, wordPart in enumerate(predictionList[1:], 1):
 			if wordPart.startswith(CONST.WORD_STEM_TRAIL_IDENTIFIER):
 				wordPrev = joinWordParts(wordPrev, wordPart)
 				continue
 			
 			# capitalization conditions
-			originalWord = originalWords[np.argmax(alphasList[i])]
+			maxLikelihoodIndex = np.argmax(alphasList[i])
+			originalWord = originalWords[maxLikelihoodIndex]
 			wordPart = capitalizeLikeOriginal(originalWord, wordPart)
 			if wordPrev in ["."]:
 				wordPart = capitalizeFirstLetter(wordPart)

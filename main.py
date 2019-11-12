@@ -45,7 +45,7 @@ def main():
 		from translator.translate import Translator
 		frToEngTranslater = Translator(startLang="fr", endLang="en", modelNum=modelNum)
 		print(CONST.LAPSED_TIME())
-		text = ["Ma question porte sur un sujet qui est à l'ordre du jour du jeudi et que je soulèverai donc une nouvelle fois."]
+		text = ["Ma question porte sur un sujet qui est à l'ordre du jour du jeudi."]
 		print(frToEngTranslater(text))
 		print(CONST.LAPSED_TIME())
 
