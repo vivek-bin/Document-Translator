@@ -217,23 +217,59 @@ def visualizeModel():
 	TM.visualizeModel(2)
 
 
-def shiftMat(inputSize=8, outputSize=8, connectionSize=3, stepSize=1):
+def shiftMat(inputSize=16, outputSize=16, connectionSize=4, stepSize=2):
 	from keras import backend as K
 
-	weights = K.reshape(K.arange(1, connectionSize*outputSize+1, dtype="float32"), shape=(connectionSize, outputSize))
+	inputSize = inputSize * 2 # double to circle over
+
+	weights = K.reshape(K.arange(1, connectionSize*outputSize+1, dtype="int16"), shape=(connectionSize, outputSize))
 	
-	padding = K.zeros(shape=(inputSize - connectionSize + stepSize, outputSize), dtype="float32")
+	padding = K.zeros(shape=(inputSize - connectionSize + stepSize, outputSize), dtype="int16")
 
 	weightsPad = K.concatenate([weights, padding], axis=0)
 	weightsPad = K.permute_dimensions(weightsPad,(1,0))
 	weightsPad = K.reshape(weightsPad, shape=(-1, outputSize))
 	weightsPad = K.permute_dimensions(weightsPad,(1,0))
+	weightsPad = K.reshape(weightsPad, shape=(inputSize, -1))
 
 	print(weights.shape)
 	print(padding.shape)
 	print(weightsPad.shape)
 	
 	print(K.eval(weightsPad))
+
+def sparseDenseLayer():
+	from keras import backend as K
+	from keras.layers import Dense
+	from keras.legacy import interfaces
+	
+
+	class SparseDense(Dense):
+		@interfaces.legacy_dense_support
+		def __init__(self, units,
+					connections=None,
+					step=0,
+					**kwargs):
+			super(SparseDense, self).__init__(units, **kwargs)
+			self.connections = connections if connections else units
+			self.step = step
+
+
+		def build(self, input_shape):
+			super(SparseDense, self).build(input_shape)
+			self.weight_mask = K.zeros(shape=(input_shape, self.units))
+			for i in range(self.units):
+				for j in range(self.connections):
+					self.weight_mask[((i*self.step)+j)%input_shape, i] = 1.
+
+		def call(self, inputs):
+			output = K.dot(inputs, self.kernel*self.weight_mask)
+			if self.use_bias:
+				output = K.bias_add(output, self.bias, data_format='channels_last')
+			if self.activation is not None:
+				output = self.activation(output)
+			return output
+
 
 shiftMat()
 
