@@ -239,28 +239,33 @@ def shiftMat(inputSize=16, outputSize=16, connectionSize=4, stepSize=2):
 	print(K.eval(weightsPad))
 
 def sparseDenseLayer():
+	import numpy as np
 	from keras import backend as K
-	from keras.layers import Dense
 	from keras.legacy import interfaces
+	from keras.datasets import mnist
+	from keras.models import Sequential, load_model
+	from keras.layers.core import Dense, Dropout, Activation
+	from keras.utils import np_utils
 	
 
 	class SparseDense(Dense):
 		@interfaces.legacy_dense_support
 		def __init__(self, units,
 					connections=None,
-					step=0,
+					step=None,
 					**kwargs):
 			super(SparseDense, self).__init__(units, **kwargs)
-			self.connections = connections if connections else units
-			self.step = step
+			self.connections = connections if connections is not None else units // 16
+			self.step = units if units is not None else connections // 4
 
 
 		def build(self, input_shape):
+			print(input_shape)
 			super(SparseDense, self).build(input_shape)
-			self.weight_mask = K.zeros(shape=(input_shape, self.units))
+			self.weight_mask = np.zeros(shape=(input_shape[1], self.units))
 			for i in range(self.units):
 				for j in range(self.connections):
-					self.weight_mask[((i*self.step)+j)%input_shape, i] = 1.
+					self.weight_mask[((i*self.step)+j)%input_shape[1], i] = 1.
 
 		def call(self, inputs):
 			output = K.dot(inputs, self.kernel*self.weight_mask)
@@ -270,6 +275,56 @@ def sparseDenseLayer():
 				output = self.activation(output)
 			return output
 
+	(X_train, y_train), (X_test, y_test) = mnist.load_data()
+	# let's print the shape before we reshape and normalize
+	print("X_train shape", X_train.shape)
+	print("y_train shape", y_train.shape)
+	print("X_test shape", X_test.shape)
+	print("y_test shape", y_test.shape)
 
-shiftMat()
+	# building the input vector from the 28x28 pixels
+	X_train = X_train.reshape(60000, 784).astype('float32')
+	X_test = X_test.reshape(10000, 784).astype('float32')
+
+	# normalizing the data to help with the training
+	X_train /= 255
+	X_test /= 255
+
+	n_classes = 10
+	Y_train = np_utils.to_categorical(y_train, n_classes)
+	Y_test = np_utils.to_categorical(y_test, n_classes)
+
+	models = []
+	# building a linear stack of layers with the sequential model
+	model = Sequential()
+	model.add(Dense(256, input_shape=(784,), activation="relu"))
+	model.add(Dense(10, activation="softmax"))
+	models.append(model)
+	
+	# building a linear stack of layers with the sequential model
+	model = Sequential()
+	model.add(SparseDense(32, connections=8, step=2, input_shape=(784,), activation="relu"))
+	model.add(Dropout(0.2))
+	model.add(SparseDense(32, connections=8, step=2, activation="relu"))
+	model.add(Dropout(0.2))
+	model.add(SparseDense(32, connections=4, step=2, activation="relu"))
+	model.add(Dropout(0.2))
+	model.add(SparseDense(32, connections=4, step=2, activation="relu"))
+	model.add(Dropout(0.2))
+	model.add(Dense(10, activation="softmax"))
+	models.append(model)
+
+	#X_train = np.random.rand(100000, 784)
+	#X_test = np.random.rand(10000, 784)
+	#Y_train = np_utils.to_categorical((np.random.rand(100000)*10).astype("int32"), 10)
+	#Y_test = np_utils.to_categorical((np.random.rand(10000)*10).astype("int32"), 10)
+	# compiling the sequential model
+	for model in models:
+		model.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer='adam')
+		model.summary()
+	for model in models:
+		history = model.fit(X_train, Y_train, batch_size=128, epochs=30, verbose=2, validation_data=(X_test, Y_test))
+
+
+sparseDenseLayer()
 
