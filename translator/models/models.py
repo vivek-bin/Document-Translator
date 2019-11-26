@@ -53,7 +53,7 @@ def translationLSTMAttModel():
 	######ENCODER PROCESSING STAGE
 	encoderStates = []
 	encoderOut = encoderEmbedding
-	for _ in range(CONST.DECODER_ENCODER_DEPTH):
+	for i in range(CONST.DECODER_ENCODER_DEPTH):
 		encoderLSTM = layers.Bidirectional(layers.LSTM(CONST.MODEL_BASE_UNITS//2, return_sequences=True, return_state=True, activation=CONST.LSTM_ACTIVATION, recurrent_activation=CONST.LSTM_RECURRENT_ACTIVATION))
 		encoderBatchNorm = layers.TimeDistributed(layers.BatchNormalization())
     
@@ -117,7 +117,7 @@ def translationLSTMAttModel():
 	#shared decoder
 	decoderStates = []
 	decoderOut = decoderEmbedding
-	for _ in range(CONST.DECODER_ENCODER_DEPTH):
+	for i in range(CONST.DECODER_ENCODER_DEPTH):
 		initialState = previousStates[i*2:(i+1)*2]
 		decoderOutNext, forwardH, forwardC = decoderLSTM_SHARED[i]([decoderOut] + initialState)
 		if CONST.RECURRENT_LAYER_RESIDUALS:

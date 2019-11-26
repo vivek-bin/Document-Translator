@@ -8,7 +8,7 @@ def sqrtScaleValues(x):
 	scale = K.sqrt(K.cast(CONST.ATTENTION_UNITS, "float32"))
 	return x/scale
 
-def sqrtScaleHideFuture(x):
+def hideFutureSteps(x):
 	from keras import backend as K
 
 	m = K.arange(K.shape(x)[1])
@@ -20,9 +20,7 @@ def sqrtScaleHideFuture(x):
 	lowValue = K.cast(K.less(m2, m1), "float32") * K.cast(-2**15, "float32")
 	lowValue = K.tile(K.expand_dims(lowValue, 0), [K.shape(x)[0], 1, 1])
 
-	scale = K.sqrt(K.cast(CONST.ATTENTION_UNITS, "float32"))
-
-	return (x/scale) * mask + lowValue
+	return (x * mask) + lowValue
 
 
 def dotAttentionFunc(inputs=[], hideFuture=False):
@@ -32,7 +30,9 @@ def dotAttentionFunc(inputs=[], hideFuture=False):
 
 	#generate alphas
 	alphas = layers.Dot(axes=2)([query, key])
-	alphas = layers.Lambda(sqrtScaleHideFuture if hideFuture else sqrtScaleValues)(alphas)
+	alphas = layers.Lambda(sqrtScaleValues)(alphas)
+	if hideFuture:
+		alphas = layers.Lambda(hideFutureSteps)(alphas)
 	alphas = layers.TimeDistributed(layers.Activation("softmax"))(alphas)
 
 	#create weighted encoder context
@@ -42,7 +42,7 @@ def dotAttentionFunc(inputs=[], hideFuture=False):
 	return [contextOut, alphas]
 
 
-def basicAttentionStage():
+def basicAttentionStage(count=0):
 	query = layers.Input(batch_shape=(None,None,CONST.MODEL_BASE_UNITS))
 	key = layers.Input(batch_shape=(None,None,CONST.MODEL_BASE_UNITS))
 
@@ -54,7 +54,7 @@ def basicAttentionStage():
 	[contextOut, alphas] = dotAttentionFunc([queryAttentionIn, keyAttentionIn, key])
 	contextOut = layers.TimeDistributed(layers.BatchNormalization())(contextOut)
 
-	attentionModel = Model(inputs=[query, key], outputs=[contextOut, alphas], name="attention_stage")
+	attentionModel = Model(inputs=[query, key], outputs=[contextOut, alphas], name="attention_stage_"+str(count))
 	return attentionModel
 
 
