@@ -5,13 +5,14 @@ import numpy as np
 
 from .. import constants as CONST
 
-def positionalEncoding(x):
+def addPositionalEncoding(x):
 	from keras import backend as K
 	
-	positionEncoding = K.variable(CONST.MAX_POSITIONAL_EMBEDDING)[0:K.shape(x)[1], 0:CONST.EMBEDDING_SIZE]
+	positionEncoding = K.variable(CONST.MAX_POSITIONAL_EMBEDDING)[0:K.shape(x)[1], 0:K.shape(x)[2]]
 	positionEncoding = K.tile(K.expand_dims(positionEncoding, 0), [K.shape(x)[0],1,1])
-	#positionEncoding = K.reshape(positionEncoding,(K.shape(x)[0], K.shape(x)[1], CONST.EMBEDDING_SIZE))
-	return positionEncoding
+	#positionEncoding = K.reshape(positionEncoding,K.shape(x))
+	x = x + positionEncoding
+	return x
 
 
 def embeddingStage(VOCABULARY_COUNT, name, addPositionalEmbedding=False):
@@ -20,10 +21,8 @@ def embeddingStage(VOCABULARY_COUNT, name, addPositionalEmbedding=False):
 	embedding = layers.Embedding(input_dim=VOCABULARY_COUNT, output_dim=CONST.EMBEDDING_SIZE)(wordInput)
 
 	if addPositionalEmbedding:
-		positionEmbedding = layers.Lambda(positionalEncoding)(embedding)
-		embedding = layers.Add()([embedding, positionEmbedding])
-
-	#embedding = layers.TimeDistributed(layers.BatchNormalization())(embedding)
+		embedding = layers.TimeDistributed(layers.BatchNormalization())(embedding)
+		embedding = layers.Lambda(addPositionalEncoding)(embedding)
 	
 	#interface with the rest of the model
 	embedding = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION))(embedding)
@@ -48,11 +47,9 @@ def wordCharEmbeddingStage(VOCABULARY_COUNT, CHAR_VOCABULARY_COUNT, name, addPos
 	embedding = layers.Concatenate()([wordEmbedding, charEmbedding])
 
 	if addPositionalEmbedding:
-		positionEmbedding = layers.Lambda(positionalEncoding)(embedding)
-		embedding = layers.Add()([embedding, positionEmbedding])
+		embedding = layers.TimeDistributed(layers.BatchNormalization())(embedding)
+		embedding = layers.Lambda(addPositionalEncoding)(embedding)
 
-	#embedding = layers.TimeDistributed(layers.BatchNormalization())(embedding)
-	
 	#interface with the rest of the model
 	embedding = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION))(embedding)
 	embedding = layers.TimeDistributed(layers.BatchNormalization())(embedding)
