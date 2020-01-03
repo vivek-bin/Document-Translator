@@ -35,7 +35,7 @@ def embeddingStage(VOCABULARY_COUNT, name, addPositionalEmbedding=False):
 def wordCharEmbeddingStage(VOCABULARY_COUNT, CHAR_VOCABULARY_COUNT, name, addPositionalEmbedding=False):
 	#word embedding
 	wordInput = layers.Input(batch_shape=(None, None))
-	wordEmbedding = layers.Embedding(input_dim=VOCABULARY_COUNT, output_dim=CONST.WORD_EMBEDDING_SIZE)(wordInput)
+	wordEmbedding = layers.Embedding(input_dim=VOCABULARY_COUNT, output_dim=CONST.EMBEDDING_SIZE)(wordInput)
 	#char embedding
 	charForwardInput = layers.Input(batch_shape=(None, None, None))
 	charBackwardInput = layers.Input(batch_shape=(None, None, None))
