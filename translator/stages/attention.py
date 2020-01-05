@@ -26,15 +26,26 @@ def hideFutureSteps(x):
 	return (x * mask) + lowValue
 
 def mergeMultihead(x):
-	xOut = K.reshape(x, (-1, K.shape(x)[2], K.shape(x)[3]))
+	batchSize = K.shape(x)[0]
+	timeSteps = K.shape(x)[1]
+	
+	xOut = K.reshape(x, (batchSize, timeSteps, CONST.NUM_ATTENTION_HEADS, -1))
+	xOut = K.permute_dimensions(xOut, (0, 2, 1, 3))
+	xOut = K.reshape(xOut, (batchSize * CONST.NUM_ATTENTION_HEADS, timeSteps, -1))
 	return xOut
 
 def splitMultihead(x):
-	xOut = K.reshape(x, (-1, CONST.NUM_ATTENTION_HEADS, K.shape(x)[1], K.shape(x)[2]))
+	timeSteps = K.shape(x)[1]
+	headVectorSize = K.shape(x)[2]
+
+	xOut = K.reshape(x, (-1, CONST.NUM_ATTENTION_HEADS, timeSteps, headVectorSize))
+	xOut = K.permute_dimensions(xOut, (0, 2, 1, 3))
+	xOut = K.reshape(xOut, (-1, timeSteps, headVectorSize * CONST.NUM_ATTENTION_HEADS))
 	return xOut
 
 def meanMultihead(x):
-	xOut = K.mean(x, axis=1)
+	xOut = K.reshape(x, (-1, CONST.NUM_ATTENTION_HEADS, K.shape(x)[1], K.shape(x)[2]))
+	xOut = K.mean(xOut, axis=1)
 	return xOut
 
 
@@ -67,15 +78,11 @@ def multiHeadAttentionStage(count=0, hideFuture=False, feedForward=True):
 
 	queryAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS, activation=CONST.DENSE_ACTIVATION))(query)
 	keyAttentionIn = layers.TimeDistributed(layers.Dense(CONST.ATTENTION_UNITS, activation=CONST.DENSE_ACTIVATION))(key)
-
-	queryAttentionIn = layers.Reshape(target_shape=(-1, CONST.NUM_ATTENTION_HEADS, CONST.ATTENTION_UNITS//CONST.NUM_ATTENTION_HEADS))(queryAttentionIn)
-	keyAttentionIn = layers.Reshape(target_shape=(-1, CONST.NUM_ATTENTION_HEADS, CONST.ATTENTION_UNITS//CONST.NUM_ATTENTION_HEADS))(keyAttentionIn)
-	
-	queryAttentionIn = layers.Permute((2, 1, 3))(queryAttentionIn)
-	keyAttentionIn = layers.Permute((2, 1, 3))(keyAttentionIn)
+	valueAttentionIn = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION))(key)
 
 	queryAttentionIn = layers.Lambda(mergeMultihead)(queryAttentionIn)
 	keyAttentionIn = layers.Lambda(mergeMultihead)(keyAttentionIn)
+	valueAttentionIn = layers.Lambda(mergeMultihead)(valueAttentionIn)
 
 	#generate alphas
 	alphas = layers.Dot(axes=2)([queryAttentionIn, keyAttentionIn])
@@ -85,22 +92,14 @@ def multiHeadAttentionStage(count=0, hideFuture=False, feedForward=True):
 	alphas = layers.TimeDistributed(layers.Activation("softmax"))(alphas)
 
 	#create weighted encoder context
-	valueAttentionIn = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION))(key)
-	valueAttentionIn = layers.Reshape(target_shape=(-1, CONST.NUM_ATTENTION_HEADS, CONST.MODEL_BASE_UNITS//CONST.NUM_ATTENTION_HEADS))(valueAttentionIn)
-	valueAttentionIn = layers.Permute((2, 1, 3))(valueAttentionIn)
-	valueAttentionIn = layers.Lambda(mergeMultihead)(valueAttentionIn)
-	
 	valuePerm = layers.Permute((2, 1))(valueAttentionIn)
 	contextOut = layers.Dot(axes=2)([alphas, valuePerm])
 
 	contextOut = layers.Lambda(splitMultihead)(contextOut)
-	contextOut = layers.Permute((2, 1, 3))(contextOut)
-	contextOut = layers.Reshape(target_shape=(-1, CONST.MODEL_BASE_UNITS))(contextOut)
-	
-	alphas = layers.Lambda(splitMultihead)(alphas)
 	alphas = layers.Lambda(meanMultihead)(alphas)
 
 	contextOut = layers.Add()([query, contextOut])
+	contextOut = layers.Reshape(target_shape=(-1, CONST.MODEL_BASE_UNITS))(contextOut)
 	contextOut = layers.TimeDistributed(layers.BatchNormalization())(contextOut)
 
 	if feedForward:

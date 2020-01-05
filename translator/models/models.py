@@ -93,7 +93,10 @@ def translationLSTMAttModel():
 	[contextOut, alphas] = attentionLayer_SHARED([decoderOut, encoderOut])
 	
 	######FINAL PREDICTION STAGE
-	outputStage_SHARED = recurrentOutputStage(OUTPUT_VOCABULARY_COUNT)
+	if CONST.SHARED_INPUT_OUTPUT_EMBEDDINGS:
+		outputStage_SHARED = recurrentOutputStage(sharedEmbedding=decoderEmbedding_SHARED)
+	else:
+		outputStage_SHARED = recurrentOutputStage(outputVocabularySize=OUTPUT_VOCABULARY_COUNT)
 	wordOut = outputStage_SHARED([contextOut, decoderOut, decoderEmbedding])
 
 	trainingModel = Model(inputs=encoderInput + decoderInput, outputs=wordOut, name="AttLSTM")
@@ -207,7 +210,10 @@ def translationTransformerModel():
 	alphas = layers.Average()(alphasList)
 	
 	######OUTPUT/PREDICTION STAGE
-	outputStage_SHARED = simpleOutputStage(OUTPUT_VOCABULARY_COUNT)
+	if CONST.SHARED_INPUT_OUTPUT_EMBEDDINGS:
+		outputStage_SHARED = simpleOutputStage(sharedEmbedding=decoderEmbedding_SHARED)
+	else:
+		outputStage_SHARED = simpleOutputStage(outputVocabularySize=OUTPUT_VOCABULARY_COUNT)
 	wordOut = outputStage_SHARED(decoderContext)
 
 	trainingModel = Model(inputs=encoderInput + decoderInput, outputs=wordOut, name="Transformer")

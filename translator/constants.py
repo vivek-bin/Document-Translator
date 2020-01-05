@@ -6,6 +6,7 @@ from time import time, ctime
 import numpy as np
 import os
 import sys
+from keras import backend as K
 
 print(ctime().rjust(60,"-"))
 START_TIME = time()
@@ -64,7 +65,6 @@ PROCESSED_DATA = DATA + "processed input/"
 
 ###data parameters
 DATA_COUNT = int(10 * 1000 * 1000)
-DATA_PARTITIONS = 30
 
 UNIT_SEP = "\x1f"
 MASK_TOKEN = "MASK"
@@ -83,6 +83,7 @@ CHAR_INPUT_SIZE = 4
 ###model parameters
 SCALE_DOWN_MODEL_BY = 1
 INCLUDE_CHAR_EMBEDDING = True
+SHARED_INPUT_OUTPUT_EMBEDDINGS = True
 
 #common model params
 NUM_ATTENTION_HEADS = 8
@@ -96,7 +97,7 @@ FEED_FORWARD_UNITS = 2048 // SCALE_DOWN_MODEL_BY
 
 LSTM_ACTIVATION = "tanh"
 LSTM_RECURRENT_ACTIVATION = "sigmoid"
-DENSE_ACTIVATION = "relu"
+DENSE_ACTIVATION = lambda x: K.maximum(x, x * 0.1) # leaky relu
 
 #recurrent model specific params
 DECODER_ENCODER_DEPTH = 4
@@ -106,22 +107,27 @@ ENCODER_ATTENTION_STAGES = 6
 DECODER_ATTENTION_STAGES = 6
 
 #transformer preprocessed data
-MAX_POSITIONAL_EMBEDDING = np.array([[pos/np.power(10, 8. * i / EMBEDDING_SIZE) for i in range(EMBEDDING_SIZE)] for pos in range(MAX_WORDS + 50)])
+MAX_POSITIONAL_EMBEDDING = np.array([[pos/np.power(10, 8. * i / MODEL_BASE_UNITS) for i in range(MODEL_BASE_UNITS)] for pos in range(MAX_WORDS * 2)])
 MAX_POSITIONAL_EMBEDDING[:, 0::2] = np.sin(MAX_POSITIONAL_EMBEDDING[:, 0::2])
 MAX_POSITIONAL_EMBEDDING[:, 1::2] = np.cos(MAX_POSITIONAL_EMBEDDING[:, 1::2])
 
 ###training parameters
+DATA_PARTITIONS = 1000
 TRAIN_SPLIT_PCT = 0.90
 TRAIN_SPLIT = int(TRAIN_SPLIT_PCT * DATA_COUNT)
 BATCH_SIZE = 32
 NUM_EPOCHS = 10
 VALIDATION_SPLIT_PCT = 0.1
 VALIDATION_SPLIT = int(VALIDATION_SPLIT_PCT * TRAIN_SPLIT)
-LEARNING_RATE = 0.1 / (5**0)
-LEARNING_RATE_DECAY = 0.1
+LEARNING_RATE = 0.0002
+LEARNING_RATE_DECAY = 0.
+SCHEDULER_LEARNING_RATE = 1 * 10**-2
+SCHEDULER_LEARNING_RAMPUP = 0.5
+SCHEDULER_LEARNING_DECAY = 4
 LABEL_SMOOTHENING = 0.0
 LOSS_FUNCTION = "sparse_categorical_crossentropy"
 EVALUATION_METRIC = "sparse_categorical_accuracy"
+CHECKPOINT_PERIOD = 25
 USE_TENSORBOARD = False
 
 MODEL_NAME_SUFFIX = ".hdf5"

@@ -5,7 +5,7 @@ from keras import layers
 from keras.optimizers import Adam
 import json
 import keras.backend as K
-from keras.callbacks import ModelCheckpoint, TensorBoard
+from keras.callbacks import ModelCheckpoint, TensorBoard, LearningRateScheduler
 import os
 from keras.utils import Sequence
 import time
@@ -152,6 +152,15 @@ def sparseCrossEntropyLoss(targets=None, outputs=None):
 		cost = -K.log(relevantValues)
 	return cost
 
+def lrScheduler(epoch):
+	x = (epoch + 1) / (CONST.NUM_EPOCHS * CONST.DATA_PARTITIONS)
+	temp = CONST.SCHEDULER_LEARNING_RAMPUP / CONST.SCHEDULER_LEARNING_DECAY
+	scale = ((1+temp)**CONST.SCHEDULER_LEARNING_DECAY) * ((1+1/temp)**CONST.SCHEDULER_LEARNING_RAMPUP)
+
+	lr = CONST.SCHEDULER_LEARNING_RATE * scale * (x**CONST.SCHEDULER_LEARNING_RAMPUP) * ((1 - x)**CONST.SCHEDULER_LEARNING_DECAY)
+
+	print("Learning rate =", lr, ", x =", x)
+	return np.clip(lr, CONST.SCHEDULER_LEARNING_RATE / 10**3, CONST.SCHEDULER_LEARNING_RATE)
 
 def saveModels(trainingModel, modelName, samplingModels=False):
 	# serialize model to JSON
@@ -268,7 +277,8 @@ def trainModel(modelNum, startLang="fr", endLang="en"):
 	
 	# prepare callbacks
 	callbacks = []
-	callbacks.append(ModelCheckpoint(CONST.MODELS + trainingModel.name + CONST.MODEL_CHECKPOINT_NAME_SUFFIX, monitor=CONST.EVALUATION_METRIC, mode='max', save_best_only=True))
+	callbacks.append(ModelCheckpoint(CONST.MODELS + trainingModel.name + CONST.MODEL_CHECKPOINT_NAME_SUFFIX, monitor=CONST.EVALUATION_METRIC, mode='max', save_best_only=True, period=CONST.CHECKPOINT_PERIOD))
+	callbacks.append(LearningRateScheduler(lrScheduler))
 
 	if CONST.USE_TENSORBOARD:
 		callbacks.append(TensorBoard(log_dir=CONST.LOGS + "tensorboard-log", histogram_freq=1, batch_size=CONST.BATCH_SIZE, write_graph=False, write_grads=True, write_images=False))
