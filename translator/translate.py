@@ -26,6 +26,7 @@ class Translator:
 
 		_, (self.samplingModelInit, self.samplingModelNext) = loadModel(self.modelNum, loadForTraining=False)
 
+		self.wordGlossary = FA.readDictionaryGlossary()[self.startLang]
 		self.wordDictionary = FA.readDictionaryPDF()[self.startLang]
 		self.spellChecker = SpellChecker(language=endLang, distance=1)
 
@@ -43,7 +44,42 @@ class Translator:
 
 
 	def encoderEncodeData(self, inputString, mergeUnk=False):
+		if CONST.GLOSSARY_UNK_REPLACE:
+			replWords = sorted(self.wordGlossary.keys(), key=lambda x: -len(x))
+			replacedString = []
+			replacedSubString = []
+			for s in inputString:
+				replacedWord = []
+				for replWord in replWords:
+					flag = True
+					while flag:
+						flag = False
+						i = s.lower().find(replWord)
+						if i >= 0:
+							if i == 0 or not s[i-1].isalnum():
+								if s[i+len(replWord)+1:].isalnum():
+									s = s.replace(replWord, CONST.SUBSTITUTION_CHAR, 1)
+									replacedWord.append((i, replWord))
+									flag = True
+				replacedString.append(s)
+
+				replacedWord2 = []
+				for i, substr in replacedSubString[::-1]:
+					replacedWord2 = [((ip if ip < i else ip + len(substr) - 1), sp) for ip, sp in replacedWord2]
+					replacedWord2.append((i,substr))
+				replacedWord = [x[1] for x in sorted(replacedWord2, key=lambda x:x[0])]
+				replacedSubString.append(replacedWord)
+			inputString = replacedString
+
 		cleanString = PD.cleanText(inputString, self.startLang)
+
+		if CONST.GLOSSARY_UNK_REPLACE:
+			for i in range(len(cleanString)):
+				s = cleanString[i]
+				for w in replacedSubString[i]:
+					s = s.replace(CONST.SUBSTITUTION_CHAR, w+CONST.SUBSTITUTION_CHAR, 1)
+				cleanString[i] = s
+
 		data = self.encodeData(cleanString, self.startLang)
 
 		return cleanString, data
@@ -74,10 +110,19 @@ class Translator:
 			if word in (CONST.UNKNOWN_TOKEN, CONST.ALPHANUM_UNKNOWN_TOKEN):
 				encoderPosition = np.argmax(alpha)
 				originalWord = originalWordParts[encoderPosition]
-				try:
-					word = self.wordDictionary[originalWord]
-				except KeyError:
-					word = originalWord
+				if CONST.GLOSSARY_UNK_REPLACE:
+					try:
+						word = self.wordGlossary[originalWord.replace(CONST.SUBSTITUTION_CHAR, "")]
+					except KeyError:
+						try:
+							word = self.wordDictionary[originalWord]
+						except KeyError:
+							word = originalWord
+				else:
+					try:
+						word = self.wordDictionary[originalWord]
+					except KeyError:
+						word = originalWord
 
 			outputWord.append(word)
 
@@ -161,7 +206,7 @@ class Translator:
 		return (wordOut[0,-1], alphas[0,-1]), preprocessed[0], preprocessed[1:]
 
 
-	def __call__(self, inputString):
+	def translate(self, inputString):
 		# prepare input sentence
 		cleanString, encoderInput = self.encoderEncodeData(inputString)
 		(wordSoftmax, firstAlpha), preprocessedEncoder, prevStates = self.sampleFirstWord(encoderInput)
@@ -234,4 +279,21 @@ class Translator:
 		outputString = self.prepareSentences(wordList=predictedWords[bestSentenceIndex].split(CONST.UNIT_SEP), originalText=cleanString[0], alphasList=alphasList[bestSentenceIndex])
 		return outputString
 
+	def translateDocument(self, path):
+		ns = {'w':'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+		
+		tree = FA.readXMLFromDoc(path)
+		root = tree.getroot()
+		paragraphs = root.findall('.//w:p', ns)
 
+		for paragraph in paragraphs:
+			rows = paragraph.findall('w:r', ns)
+			for row in rows:
+				rowText = row.find('w:t', ns)
+				if rowText != None:
+					rowText.text = self.translate(rowText.text)
+		FA.writeXMLToDoc(tree, path.split(".")[0] + "_" + self.endLang + path.split(".")[1])
+		return False
+
+	def __call__(self, path):
+		return self.translateDocument(path)

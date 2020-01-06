@@ -1,9 +1,19 @@
 from .. import constants as CONST
 import gzip
 import os
+import xlrd
+import csv
 from PyPDF2 import PdfFileReader
+from docx_utils.flatten import opc_to_flat_opc
+import xml.etree.ElementTree as ET 
 
-MAX_WORDS = 60
+
+def getAllFilePaths(path):
+	paths = []
+	for root, _, files in os.walk(path):
+		for f in files:
+			paths.append(os.path.join(root,f))
+	return paths
 
 def readFile(fileName):
 	file = []
@@ -11,6 +21,23 @@ def readFile(fileName):
 		file = list(f)
 
 	return file
+
+def writeFile(fileName, fileData):
+	file = open(CONST.LOGS+fileName,mode="w",encoding="utf-8")
+	file.writelines("\n".join(fileData))
+	file.close()
+
+def readCSV(fileName):
+	with open(fileName, 'rb') as f:
+		reader = csv.reader(f)
+		data = list(reader)
+	return data
+	
+def writeCSV(fileName, rows, mode="a"):
+	with open(fileName, mode, encoding="utf-8-sig") as f:
+		writer = csv.writer(f)
+		for row in rows:
+			writer.writerow(row)
 
 def writeProcessedData(data, fileName):
 	with open(CONST.PROCESSED_DATA + fileName + ".txt", "w", encoding="utf-8") as f:
@@ -38,6 +65,62 @@ def readArchiveFile(fileName):
 	file = file.strip().split("\n")
 	return file
 	
+def writeXMLToDoc(tree, filePath):
+	ET.register_namespace('w',"http://schemas.openxmlformats.org/wordprocessingml/2006/main")
+	ET.register_namespace('pkg',"http://schemas.microsoft.com/office/2006/xmlPackage")
+
+    # convert and write to disk -> load to mem -> delete from disk
+	tree.write(filePath.split(".")[0]+".xml")
+	raise Exception
+	gfhfhf
+
+	return tree
+
+def readXMLFromDoc(fileName):
+	ET.register_namespace('w',"http://schemas.openxmlformats.org/wordprocessingml/2006/main")
+	ET.register_namespace('pkg',"http://schemas.microsoft.com/office/2006/xmlPackage")
+
+    # convert and write to disk -> load to mem -> delete from disk
+	xmlPath = fileName.split('.')[0]+'.xml'
+	opc_to_flat_opc(fileName ,xmlPath)
+	tree = ET.parse(xmlPath)
+	os.remove(xmlPath)
+
+	return tree
+
+def extractTextFromXML(path):
+	ns = {'w':'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+	outText = []
+	
+	tree = readXMLFromDoc(path)
+	root = tree.getroot()
+	paragraphs = root.findall('.//w:p', ns)
+	for paragraph in paragraphs:
+		rows = paragraph.findall('w:r', ns)
+		paraText = ""
+		for row in rows:
+			rowText = row.find('w:t', ns)
+			if rowText != None:
+				paraText = paraText + rowText.text
+		
+		if paraText.strip():
+			outText.append(paraText)
+	
+	return outText
+
+def writeAllSFDData():
+	englishPaths = getAllFilePaths(CONST.PROJECT_TRANSLATIONS_EN_PATH)
+	frenchPaths = getAllFilePaths(CONST.PROJECT_TRANSLATIONS_FR_PATH)
+
+	for englishPath, frenchPath in zip(englishPaths, frenchPaths):
+		englishText = extractTextFromXML(englishPath)
+		frenchText = extractTextFromXML(frenchPath)
+		
+		writeCSV(CONST.PROJECT_TRANSLATIONS_EXTRACT_CSV_PATH, zip(englishText, frenchText))
+
+	
+def loadSFDData():
+	return readCSV(CONST.PROJECT_TRANSLATIONS_EXTRACT_CSV_PATH)
 
 def loadStandard(name):
 	fileFr = readFile(CONST.DATA + name + ".fr")
@@ -67,7 +150,6 @@ def loadHansards():
 	print("Hansards length = "+str(len(fileEn)))
 	return fileFr, fileEn
 	
-
 def loadFraEng():
 	fileBoth = readFile(CONST.FRA_EN_DATA)
 	fileBoth = [line.split("\t") for line in fileBoth]
@@ -80,7 +162,7 @@ def loadFraEng():
 
 	print("fra-eng length = "+str(len(fileEn)))
 	return fileFr, fileEn
-	
+
 def readDictionaryPDF(bestWordOnly=True):
 	with open(CONST.DICTIONARY_PATH, "rb") as pdfFileBinary:
 		pdfFile = PdfFileReader(pdfFileBinary)
@@ -112,8 +194,21 @@ def readDictionaryPDF(bestWordOnly=True):
 
 	return wordDict
 
+def readDictionaryGlossary(bestWordOnly=True):
+	wb = xlrd.open_workbook(CONST.GLOSSARY_PATH) 
+	sheet = wb.sheet_by_index(0) 
+	i = 0
+	frToEngDict = {}
+	engToFrDict = {}
+	while sheet.cell_value(i, 0):
+		i = i + 1
+		a = str(sheet.cell_value(i, 0)).strip()
+		b = str(sheet.cell_value(i, 1)).strip()
+		frToEngDict[a.lower()] = b
+		engToFrDict[b.lower()] = a
+	
+	wordDict = {}
+	wordDict["en"] = engToFrDict
+	wordDict["fr"] = frToEngDict
 
-def writeFile(fileName, fileData):
-	file = open(CONST.LOGS+fileName,mode="w",encoding="utf-8")
-	file.writelines("\n".join(fileData))
-	file.close()
+	return wordDict
