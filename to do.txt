@@ -3,4 +3,5 @@
     - create document translation function
             - allow token replacement for set words
             - correct SFD document read/replacement
-- pypdf2 editting scripts complete
+- pypdf2 editting scripts to be completed
+- recurren model merge attention at each step
