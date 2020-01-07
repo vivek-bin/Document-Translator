@@ -282,8 +282,7 @@ class Translator:
 	def translateDocument(self, path):
 		ns = {'w':'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
 		
-		tree = FA.readXMLFromDoc(path)
-		root = tree.getroot()
+		root = FA.readXMLFromDoc(path)
 		paragraphs = root.findall('.//w:p', ns)
 
 		for paragraph in paragraphs:
@@ -292,8 +291,7 @@ class Translator:
 				rowText = row.find('w:t', ns)
 				if rowText != None:
 					rowText.text = self.translate(rowText.text)
-		FA.writeXMLToDoc(tree, path.split(".")[0] + "_" + self.endLang + path.split(".")[1])
+		
+		FA.updateDoc(root, path, path.split(".")[0] + "_" + self.endLang + path.split(".")[1])
 		return False
 
-	def __call__(self, path):
-		return self.translateDocument(path)

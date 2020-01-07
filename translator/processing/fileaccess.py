@@ -4,8 +4,8 @@ import os
 import xlrd
 import csv
 from PyPDF2 import PdfFileReader
-from docx_utils.flatten import opc_to_flat_opc
-import xml.etree.ElementTree as ET 
+import xml.etree.ElementTree as ET
+import zipfile
 
 
 def getAllFilePaths(path):
@@ -65,35 +65,37 @@ def readArchiveFile(fileName):
 	file = file.strip().split("\n")
 	return file
 	
-def writeXMLToDoc(tree, filePath):
+def writeUpdatedDoc(root, oldFilePath, newFilePath):
 	ET.register_namespace('w',"http://schemas.openxmlformats.org/wordprocessingml/2006/main")
 	ET.register_namespace('pkg',"http://schemas.microsoft.com/office/2006/xmlPackage")
 
-    # convert and write to disk -> load to mem -> delete from disk
-	tree.write(filePath.split(".")[0]+".xml")
-	raise Exception
-	gfhfhf
-
-	return tree
+	zin = zipfile.ZipFile (oldFilePath, 'r')
+	zout = zipfile.ZipFile (newFilePath, 'w')
+	for fileInfo in zin.infolist():
+		fileData = zin.read(fileInfo.filename)
+		if (fileInfo.filename == "word/document.xml"):
+			zout.writestr(fileInfo, root.tostring())
+		else:
+			zout.writestr(fileInfo, fileData)
+	zout.close()
+	zin.close()
 
 def readXMLFromDoc(fileName):
 	ET.register_namespace('w',"http://schemas.openxmlformats.org/wordprocessingml/2006/main")
 	ET.register_namespace('pkg',"http://schemas.microsoft.com/office/2006/xmlPackage")
 
-    # convert and write to disk -> load to mem -> delete from disk
-	xmlPath = fileName.split('.')[0]+'.xml'
-	opc_to_flat_opc(fileName ,xmlPath)
-	tree = ET.parse(xmlPath)
-	os.remove(xmlPath)
+	docxFile = zipfile.ZipFile(fileName)
+	xml = docxFile.read("word/document.xml")
+	docxFile.close()
+	root = ET.fromstring(xml)
 
-	return tree
+	return root
 
 def extractTextFromXML(path):
 	ns = {'w':'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
 	outText = []
 	
-	tree = readXMLFromDoc(path)
-	root = tree.getroot()
+	root = readXMLFromDoc(path)
 	paragraphs = root.findall('.//w:p', ns)
 	for paragraph in paragraphs:
 		rows = paragraph.findall('w:r', ns)

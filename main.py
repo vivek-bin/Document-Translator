@@ -8,45 +8,70 @@ def main():
 	prepareDataFlag = False
 	trainModelFlag = False
 	translateFlag = False
+	modelNum = 0
+	text = []
+	documents = []
 
-	if not flags:
-		translateFlag = True
-		modelNum = 1
-	else:
-		for flag in flags:
-			if flag not in VALID_FLAGS and flag not in ["1","2"]:
-				print("Invalid flag. Valid flags are "+", ".join(VALID_FLAGS))
-				return False
+
+	try:
+		if flags[0] not in VALID_FLAGS:
+			print("Invalid flag. Valid flags are "+", ".join(VALID_FLAGS))
+			return False
 		if "--prep" == flags[0]:
 			prepareDataFlag = True
 		if "--train" == flags[0]:
 			trainModelFlag = True
-			try:
-				modelNum = int(flags[1])
-			except IndexError:
-				modelNum = 1
-			
 		if "--translate" == flags[0]:
 			translateFlag = True
-			try:
-				modelNum = int(flags[1])
-			except IndexError:
-				modelNum = 1
+		flags.pop(0)
+	except IndexError:
+		translateFlag = True
+	
+	try:
+		i = flags.index("-m")
+		modelNum = int(flags.pop(i+1))
+		flags.pop(i)
+	except IndexError:
+		modelNum = 1
+
+	try:
+		i = flags.index("-s")
+		flags.pop(i)
+		text = flags
+	except IndexError:
+		pass
+
+	try:
+		i = flags.index("-d")
+		flags.pop(i)
+		text = flags
+	except IndexError:
+		pass
 
 	if prepareDataFlag:
 		from translator.preparedata import writeEncodingsData
 		writeEncodingsData()
 
 	if trainModelFlag:
+		assert modelNum in [1, 2]
+
 		from translator.trainmodel import trainModel
 		trainModel(startLang="fr", endLang="en", modelNum=modelNum)
 
 	if translateFlag:
+		text = ["Ma question porte sur un sujet qui est à l'ordre du jour du jeudi."]		#testing
+		assert modelNum in [1, 2]
+		assert bool(text) ^ bool(documents)
+
 		from translator.translate import Translator
 		frToEngTranslater = Translator(startLang="fr", endLang="en", modelNum=modelNum)
 		print(CONST.LAPSED_TIME())
-		text = ["Ma question porte sur un sujet qui est à l'ordre du jour du jeudi."]
-		print(frToEngTranslater.translate(text))
+		if documents:
+			for doc in documents:
+				frToEngTranslater.translateDocument(doc)
+		else:
+			for line in text:
+				print(frToEngTranslater.translate([line]))
 		print(CONST.LAPSED_TIME())
 
 
