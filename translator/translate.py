@@ -58,13 +58,14 @@ class Translator:
 						if i >= 0:
 							if i == 0 or not s[i-1].isalnum():
 								if s[i+len(replWord)+1:].isalnum():
-									s = s.replace(replWord, CONST.SUBSTITUTION_CHAR, 1)
-									replacedWord.append((i, replWord))
+									temp = s[i:i+len(replWord)]
+									replacedWord.append((i, temp))
+									s = s.replace(temp, CONST.SUBSTITUTION_CHAR, 1)
 									flag = True
 				replacedString.append(s)
 
 				replacedWord2 = []
-				for i, substr in replacedSubString[::-1]:
+				for i, substr in replacedWord[::-1]:
 					replacedWord2 = [((ip if ip < i else ip + len(substr) - 1), sp) for ip, sp in replacedWord2]
 					replacedWord2.append((i,substr))
 				replacedWord = [x[1] for x in sorted(replacedWord2, key=lambda x:x[0])]
@@ -290,8 +291,8 @@ class Translator:
 			for row in rows:
 				rowText = row.find('w:t', ns)
 				if rowText != None:
-					rowText.text = self.translate(rowText.text)
+					rowText.text = self.translate([rowText.text])
 		
-		FA.updateDoc(root, path, path.split(".")[0] + "_" + self.endLang + path.split(".")[1])
+		FA.writeUpdatedDoc(root, path, path.split(".")[0] + "_" + self.endLang + "." + path.split(".")[1])
 		return False
 

@@ -31,21 +31,21 @@ def main():
 		i = flags.index("-m")
 		modelNum = int(flags.pop(i+1))
 		flags.pop(i)
-	except IndexError:
+	except ValueError:
 		modelNum = 1
 
 	try:
 		i = flags.index("-s")
 		flags.pop(i)
 		text = flags
-	except IndexError:
+	except ValueError:
 		pass
 
 	try:
 		i = flags.index("-d")
 		flags.pop(i)
-		text = flags
-	except IndexError:
+		documents = flags
+	except ValueError:
 		pass
 
 	if prepareDataFlag:

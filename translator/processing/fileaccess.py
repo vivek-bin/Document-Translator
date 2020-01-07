@@ -74,7 +74,7 @@ def writeUpdatedDoc(root, oldFilePath, newFilePath):
 	for fileInfo in zin.infolist():
 		fileData = zin.read(fileInfo.filename)
 		if (fileInfo.filename == "word/document.xml"):
-			zout.writestr(fileInfo, root.tostring())
+			zout.writestr(fileInfo, ET.tostring(root))
 		else:
 			zout.writestr(fileInfo, fileData)
 	zout.close()
@@ -202,12 +202,17 @@ def readDictionaryGlossary(bestWordOnly=True):
 	i = 0
 	frToEngDict = {}
 	engToFrDict = {}
-	while sheet.cell_value(i, 0):
-		i = i + 1
-		a = str(sheet.cell_value(i, 0)).strip()
-		b = str(sheet.cell_value(i, 1)).strip()
-		frToEngDict[a.lower()] = b
-		engToFrDict[b.lower()] = a
+	
+	for i in range(sheet.nrows):
+		fr = str(sheet.cell_value(i, 0)).strip()
+		en = str(sheet.cell_value(i, 1)).strip()
+		if fr and en:
+			fr = fr.split("|")
+			en = en.split("|")
+			for f in fr:
+				frToEngDict[f.lower()] = en[0]
+			for e in en:
+				engToFrDict[e.lower()] = fr[0]
 	
 	wordDict = {}
 	wordDict["en"] = engToFrDict

@@ -8,6 +8,6 @@
 - final translation - switch from "greedy" to "maximum coverage" based
     * create document translation function
             > allow token replacement for set words
-            > correct SFD document read/replacement
+    * correct SFD document read/replacement
             > pypdf2 editting scripts to be completed
 - recurrent model merge attention at each step
