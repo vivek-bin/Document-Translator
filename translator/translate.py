@@ -57,7 +57,7 @@ class Translator:
 						i = s.lower().find(replWord)
 						if i >= 0:
 							if i == 0 or not s[i-1].isalnum():
-								if s[i+len(replWord)+1:].isalnum():
+								if not s[i+len(replWord):][0:1].isalnum():
 									temp = s[i:i+len(replWord)]
 									replacedWord.append((i, temp))
 									s = s.replace(temp, CONST.SUBSTITUTION_CHAR, 1)
@@ -77,9 +77,11 @@ class Translator:
 		if CONST.GLOSSARY_UNK_REPLACE:
 			for i in range(len(cleanString)):
 				s = cleanString[i]
+				print(s)
 				for w in replacedSubString[i]:
-					s = s.replace(CONST.SUBSTITUTION_CHAR, w+CONST.SUBSTITUTION_CHAR, 1)
+					s = s.replace(CONST.SUBSTITUTION_CHAR, w+CONST.SUBSTITUTION_CHAR_2, 1)
 				cleanString[i] = s
+				print(s)
 
 		data = self.encodeData(cleanString, self.startLang)
 
@@ -113,7 +115,7 @@ class Translator:
 				originalWord = originalWordParts[encoderPosition]
 				if CONST.GLOSSARY_UNK_REPLACE:
 					try:
-						word = self.wordGlossary[originalWord.replace(CONST.SUBSTITUTION_CHAR, "")]
+						word = self.wordGlossary[originalWord.replace(CONST.SUBSTITUTION_CHAR_2, "")]
 					except KeyError:
 						try:
 							word = self.wordDictionary[originalWord]
@@ -143,7 +145,7 @@ class Translator:
 			coveragePenalty = coveragePenalty + np.log(alphaSum)
 		coveragePenalty = CONST.COVERAGE_PENALTY_COEFF * coveragePenalty
 
-		calculatedScore = (np.log(score) / lengthPenalty) + coveragePenalty
+		calculatedScore = -(np.log(score) / lengthPenalty) + coveragePenalty
 		return calculatedScore
 
 
@@ -263,7 +265,7 @@ class Translator:
 					predictedWord, score = self.decodeWord(wordOut[i,-1], alphas[i,-1], cleanString)
 					score = self.normalizeScore(score, predictedWord, alphasList[i])
 
-					allScores.append(cumulativeScore[i] * score)							# cumulate scores with existing sequences
+					allScores.append(cumulativeScore[i] + score)							# cumulate scores with existing sequences
 					allPredictions.append(predictedWord)
 
 			# if any prediction contained END OF SEQUENCE, translation finished
@@ -300,7 +302,7 @@ class Translator:
 			completedSentences = list(range(len(predictedWords)))
 
 		bestSentenceIndex = int(np.where(cumulativeScore == np.min(cumulativeScore[completedSentences]))[0][0])
-		outputString = self.prepareSentences(wordList=predictedWords[bestSentenceIndex].split(CONST.UNIT_SEP), originalText=cleanString, alphasList=alphasList[bestSentenceIndex])
+		outputString = self.prepareSentences(wordList=predictedWords[bestSentenceIndex], originalText=cleanString, alphasList=alphasList[bestSentenceIndex])
 		return outputString
 
 	def translateDocument(self, path):

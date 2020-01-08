@@ -207,8 +207,8 @@ def readDictionaryGlossary(bestWordOnly=True):
 		fr = str(sheet.cell_value(i, 0)).strip()
 		en = str(sheet.cell_value(i, 1)).strip()
 		if fr and en:
-			fr = fr.split("|")
-			en = en.split("|")
+			fr = [x for x in fr.split("|") if x.strip()]
+			en = [x for x in en.split("|") if x.strip()]
 			for f in fr:
 				frToEngDict[f.lower()] = en[0]
 			for e in en:
