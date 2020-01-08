@@ -155,12 +155,12 @@ def sparseCrossEntropyLoss(targets=None, outputs=None):
 def lrScheduler(epoch):
 	x = (epoch + 1) / (CONST.NUM_EPOCHS * CONST.DATA_PARTITIONS)
 	temp = CONST.SCHEDULER_LEARNING_RAMPUP / CONST.SCHEDULER_LEARNING_DECAY
-	scale = ((1+temp)**CONST.SCHEDULER_LEARNING_DECAY) * ((1+1/temp)**CONST.SCHEDULER_LEARNING_RAMPUP) * 1.3
+	scale = ((1+temp)**CONST.SCHEDULER_LEARNING_DECAY) * ((1+1/temp)**CONST.SCHEDULER_LEARNING_RAMPUP) * CONST.SCHEDULER_LEARNING_SCALE
 
 	lr = CONST.SCHEDULER_LEARNING_RATE * scale * (x**CONST.SCHEDULER_LEARNING_RAMPUP) * ((1 - x)**CONST.SCHEDULER_LEARNING_DECAY)
 
 	print("Learning rate =", lr)
-	return np.clip(lr, CONST.SCHEDULER_LEARNING_RATE * 10**-3, CONST.SCHEDULER_LEARNING_RATE)
+	return np.clip(lr, CONST.SCHEDULER_LEARNING_RATE_MIN, CONST.SCHEDULER_LEARNING_RATE)
 
 def saveModels(trainingModel, modelName, samplingModels=False):
 	# serialize model to JSON

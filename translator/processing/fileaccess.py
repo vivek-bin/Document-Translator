@@ -111,8 +111,8 @@ def extractTextFromXML(path):
 	return outText
 
 def writeAllSFDData():
-	englishPaths = getAllFilePaths(CONST.PROJECT_TRANSLATIONS_EN_PATH)
-	frenchPaths = getAllFilePaths(CONST.PROJECT_TRANSLATIONS_FR_PATH)
+	englishPaths = [f for f in getAllFilePaths(CONST.PROJECT_TRANSLATIONS_EN_PATH) if f.split(".")[-1].startswith("doc")]
+	frenchPaths = [f for f in getAllFilePaths(CONST.PROJECT_TRANSLATIONS_FR_PATH) if f.split(".")[-1].startswith("doc")]
 
 	for englishPath, frenchPath in zip(englishPaths, frenchPaths):
 		englishText = extractTextFromXML(englishPath)

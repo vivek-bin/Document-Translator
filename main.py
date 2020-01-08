@@ -59,7 +59,7 @@ def main():
 		trainModel(startLang="fr", endLang="en", modelNum=modelNum)
 
 	if translateFlag:
-		text = ["Ma question porte sur un sujet qui est à l'ordre du jour du jeudi."]		#testing
+		text = ["Ma question porte sur un sujet qui est à l'ordre du jour du jeudi."] + text		#testing
 		assert modelNum in [1, 2]
 		assert bool(text) ^ bool(documents)
 
@@ -71,7 +71,7 @@ def main():
 				frToEngTranslater.translateDocument(doc)
 		else:
 			for line in text:
-				print(frToEngTranslater.translate([line]))
+				print(frToEngTranslater.translate(line))
 		print(CONST.LAPSED_TIME())
 
 
