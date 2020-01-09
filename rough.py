@@ -329,5 +329,33 @@ def xmlTesting():
 	import translator.processing.fileaccess as FA
 	FA.writeAllSFDData()
 
-xmlTesting()
+def xmlDetails():
+	import translator.processing.fileaccess as FA
+	import translator.constants as CONST
+	
+	englishPaths = [f for f in FA.getAllFilePaths(CONST.PROJECT_TRANSLATIONS_EN_PATH) if f.split(".")[-1].startswith("doc")]
+	frenchPaths = [f for f in FA.getAllFilePaths(CONST.PROJECT_TRANSLATIONS_FR_PATH) if f.split(".")[-1].startswith("doc")]
+
+	def getTags(x):
+		tags = set()
+		tags.add(x.tag.split("}")[-1])
+		for t in x:
+			tags = tags | getTags(t)
+
+		return tags
+
+	for englishPath, frenchPath in zip(englishPaths, frenchPaths):
+		root = FA.readXMLFromDoc(englishPath)
+		e = getTags(root)
+		root = FA.readXMLFromDoc(frenchPath)
+		f = getTags(root)
+
+		print(sorted(e))
+		print(e^f)
+
+
+
+
+
+xmlDetails()
 
