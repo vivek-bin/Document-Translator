@@ -6,6 +6,7 @@ import csv
 from PyPDF2 import PdfFileReader
 import xml.etree.ElementTree as ET
 import zipfile
+import math
 
 
 def getAllFilePaths(path):
@@ -34,7 +35,7 @@ def readCSV(fileName):
 	return data
 	
 def writeCSV(fileName, rows, mode="a"):
-	with open(fileName, mode, encoding="utf-8-sig") as f:
+	with open(fileName, mode, encoding="utf-8-sig", newline="") as f:
 		writer = csv.writer(f)
 		for row in rows:
 			writer.writerow(row)
@@ -90,36 +91,6 @@ def readXMLFromDoc(fileName):
 	root = ET.fromstring(xml)
 
 	return root
-
-def extractTextFromXML(path):
-	ns = {'w':'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
-	outText = []
-	
-	root = readXMLFromDoc(path)
-	paragraphs = root.findall('.//w:p', ns)
-	for paragraph in paragraphs:
-		rows = paragraph.findall('w:r', ns)
-		paraText = ""
-		for row in rows:
-			rowText = row.find('w:t', ns)
-			if rowText != None:
-				paraText = paraText + rowText.text
-		
-		if paraText.strip():
-			outText.append(paraText)
-	
-	return outText
-
-def writeAllSFDData():
-	englishPaths = [f for f in getAllFilePaths(CONST.PROJECT_TRANSLATIONS_EN_PATH) if f.split(".")[-1].startswith("doc")]
-	frenchPaths = [f for f in getAllFilePaths(CONST.PROJECT_TRANSLATIONS_FR_PATH) if f.split(".")[-1].startswith("doc")]
-
-	for englishPath, frenchPath in zip(englishPaths, frenchPaths):
-		englishText = extractTextFromXML(englishPath)
-		frenchText = extractTextFromXML(frenchPath)
-		
-		writeCSV(CONST.PROJECT_TRANSLATIONS_EXTRACT_CSV_PATH, zip(englishText, frenchText))
-
 	
 def loadSFDData():
 	return readCSV(CONST.PROJECT_TRANSLATIONS_EXTRACT_CSV_PATH)

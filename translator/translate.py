@@ -305,18 +305,41 @@ class Translator:
 		outputString = self.prepareSentences(wordList=predictedWords[bestSentenceIndex], originalText=cleanString, alphasList=alphasList[bestSentenceIndex])
 		return outputString
 
-	def translateDocument(self, path):
-		ns = {'w':'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
-		
-		root = FA.readXMLFromDoc(path)
-		paragraphs = root.findall('.//w:p', ns)
+	def updateTextTags(self, textTags, text):
+		originalText = FA.joinXMLTextTags(textTags)
+		relativePosFactor = len(text) / len(originalText)
+		for tag in textTags:
+			if not tag.text:
+				continue
+			if not tag.text.strip():
+				if not text[:len(tag.text)].strip():
+					text = text[len(tag.text):]
+				continue
+			if len(tag.text.strip()) == 1:
+				for i, c in enumerate(tag.text):
+					if c.strip():
+						break
 
-		for paragraph in paragraphs:
-			rows = paragraph.findall('w:r', ns)
-			for row in rows:
-				rowText = row.find('w:t', ns)
-				if rowText != None:
-					rowText.text = "\n".join([self.translate(t) for t in rowText.text.split("\n")])
+				tag.text = text[:i+1]
+				text = text[i+1:]
+				continue
+			if not text:
+				tag.text = ""
+			l = int(round(len(tag.text) * relativePosFactor)) or 1
+			tag.text = text[:l]
+			text = text[l:]
+
+		if text:
+			textTags[-1].text = textTags[-1].text + text
+	
+	def translateDocument(self, path):
+		root = FA.readXMLFromDoc(path)
+
+		for textTags in PD.getTextBlocks(root):
+			original = PD.joinTextTags(textTags)
+			if not original.strip().isnumeric():
+				translation = self.translate(original)
+				self.updateTextTags(textTags, translation)
 		
 		FA.writeUpdatedDoc(root, path, path.split(".")[0] + "_" + self.endLang + "." + path.split(".")[1])
 		return False

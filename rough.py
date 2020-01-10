@@ -323,11 +323,11 @@ def sparseDenseLayer():
 		model.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer='adam')
 		model.summary()
 	for model in models:
-		history = model.fit(X_train, Y_train, batch_size=128, epochs=30, verbose=2, validation_data=(X_test, Y_test))
+		_ = model.fit(X_train, Y_train, batch_size=128, epochs=30, verbose=2, validation_data=(X_test, Y_test))
 
 def xmlTesting():
-	import translator.processing.fileaccess as FA
-	FA.writeAllSFDData()
+	import translator.preparedata as PD
+	PD.writeAllSFDData()
 
 def xmlDetails():
 	import translator.processing.fileaccess as FA
@@ -357,5 +357,5 @@ def xmlDetails():
 
 
 
-xmlDetails()
+xmlTesting()
 
