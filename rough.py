@@ -353,9 +353,13 @@ def xmlDetails():
 		print(sorted(e))
 		print(e^f)
 
+def docextract():
+	from translator.processing import docalign
+	docalign.extractPairedData()
 
 
 
 
-xmlTesting()
+
+docextract()
 
