@@ -293,55 +293,6 @@ def writeDataDetailsToLog(fr, en):
 
 	charExamples(en, fr)
 	
-def getXMLTextBlocks(x, skipContents=False):
-	def isTag(element, tag):
-		return ((element.tag.split("}")[-1]) == tag)
-
-	if isTag(x, "p"):
-		textTags = [rt for pt in x for rt in pt if isTag(pt, "r") and (isTag(rt, "t") or isTag(rt, "tab"))]
-		tabPos = [i for i, t in enumerate(textTags) if isTag(t, "tab")]
-		prevPos = 0
-		for pos in tabPos:
-			temp = textTags[prevPos:pos]
-			prevPos = pos + 1
-			yield temp
-		yield textTags[prevPos:]
-	else:
-		for xt in x:
-			if (not skipContents) or (not isTag(xt, "sdtContent")):
-				yield from getXMLTextBlocks(xt, skipContents=skipContents)
-
-def joinXMLTextGen(textTagsGen):
-	for textTags in textTagsGen:
-		x = joinXMLTextTags(textTags)
-		if x:
-			yield x
-	
-def joinXMLTextTags(textTags):
-	joinedText = ""
-	for tt in textTags:
-		attributes = [a.split("}")[-1] for a in tt.attrib.keys()]
-		if "space" in attributes:
-			text = tt.text
-		else:
-			text = tt.text.strip()
-		joinedText = joinedText + text
-	
-	return joinedText.strip()
-
-def writeAllSFDData():
-	englishPaths = sorted([f for f in FA.getAllFilePaths(CONST.PROJECT_TRANSLATIONS_EN_PATH) if f.split(".")[-1].lower() == "docx"])
-	frenchPaths = sorted([f for f in FA.getAllFilePaths(CONST.PROJECT_TRANSLATIONS_FR_PATH) if f.split(".")[-1].lower() == "docx"])
-
-	for englishPath, frenchPath in zip(englishPaths, frenchPaths):
-		englishXML = FA.readXMLFromDoc(englishPath)
-		englishTextGen = getXMLTextBlocks(englishXML, skipContents=True)
-
-		frenchXML = FA.readXMLFromDoc(frenchPath)
-		frenchTextGen = getXMLTextBlocks(frenchXML, skipContents=True)
-		
-		FA.writeCSV(CONST.PROJECT_TRANSLATIONS_EXTRACT_CSV_PATH, zip(joinXMLTextGen(englishTextGen), joinXMLTextGen(frenchTextGen)))
-
 def main():
 	writeEncodingsData()
 

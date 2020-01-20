@@ -325,10 +325,6 @@ def sparseDenseLayer():
 	for model in models:
 		_ = model.fit(X_train, Y_train, batch_size=128, epochs=30, verbose=2, validation_data=(X_test, Y_test))
 
-def xmlTesting():
-	import translator.preparedata as PD
-	PD.writeAllSFDData()
-
 def xmlDetails():
 	import translator.processing.fileaccess as FA
 	import translator.constants as CONST
@@ -354,8 +350,8 @@ def xmlDetails():
 		print(e^f)
 
 def docextract():
-	from translator.processing import docalign
-	docalign.extractPairedData()
+	from translator.processing import projextract
+	projextract.extractFilesAllDirectories()
 
 
 
