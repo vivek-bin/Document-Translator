@@ -1,9 +1,11 @@
 import json
 import numpy as np
+import re
 from spellchecker import SpellChecker
 
 from . import constants as CONST
 from . import preparedata as PD
+from .processing import projextract as PE
 from .trainmodel import loadModel
 from .processing import fileaccess as FA
 
@@ -77,11 +79,9 @@ class Translator:
 		if CONST.GLOSSARY_UNK_REPLACE:
 			for i in range(len(cleanString)):
 				s = cleanString[i]
-				print(s)
 				for w in replacedSubString[i]:
 					s = s.replace(CONST.SUBSTITUTION_CHAR, w+CONST.SUBSTITUTION_CHAR_2, 1)
 				cleanString[i] = s
-				print(s)
 
 		data = self.encodeData(cleanString, self.startLang)
 
@@ -150,7 +150,6 @@ class Translator:
 
 
 	def prepareSentences(self, wordList, originalText, alphasList, correctBadWords=False):
-		print(CONST.LAPSED_TIME())
 		def capitalizeFirstLetter(word):
 			return word[0].upper() + word[1:]
 		def capitalizeLikeOriginal(originalWord, word):
@@ -306,7 +305,7 @@ class Translator:
 		return outputString
 
 	def updateTextTags(self, textTags, text):
-		originalText = FA.joinXMLTextTags(textTags)
+		originalText = PE.joinXMLTextTags(textTags)
 		relativePosFactor = len(text) / len(originalText)
 		for tag in textTags:
 			if not tag.text:
@@ -333,11 +332,12 @@ class Translator:
 			textTags[-1].text = textTags[-1].text + text
 	
 	def translateDocument(self, path):
+		print(CONST.LAPSED_TIME())
 		root = FA.readXMLFromDoc(path)
 
-		for textTags in PD.getTextBlocks(root):
-			original = PD.joinTextTags(textTags)
-			if not original.strip().isnumeric():
+		for textTags in PE.getXMLTextBlocks(root):
+			original = PE.joinXMLTextTags(textTags)
+			if re.search("[a-zA-Z]", original):
 				translation = self.translate(original)
 				self.updateTextTags(textTags, translation)
 		
