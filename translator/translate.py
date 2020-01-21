@@ -338,7 +338,7 @@ class Translator:
 
 		for textTags in PE.getXMLTextBlocks(root):
 			original = PE.joinXMLTextTags(textTags)
-			if re.search("[a-zA-Z]", original) and False:
+			if re.search("[a-zA-Z]", original):
 				translation = self.translate(original)
 				self.updateTextTags(textTags, translation)
 		

@@ -162,7 +162,7 @@ def extractFilesAllDirectories():
 	for d in sorted(os.listdir(CONST.PROJECT_TRANSLATIONS_MATCHED_PATH)):
 		print(d)
 		inputDir = CONST.PROJECT_TRANSLATIONS_MATCHED_PATH + d + "/"
-		outputDir = inputDir + "csv/"
+		outputDir = CONST.PROJECT_TRANSLATIONS_EXTRACT_PATH + d + "/"
 
 		for d2 in sorted(os.listdir(inputDir)):
 			inputDir2 = inputDir + d2 + "/"
