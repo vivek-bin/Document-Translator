@@ -180,10 +180,20 @@ def extractFilesAllDirectories():
 			if docFiles:
 				assert len(docFiles) == 2, str(docFiles)
 				frenchXML = FA.readXMLFromDoc(docFiles[0])
-				frenchTextGen = getXMLTextBlocks(frenchXML, skipContents=True)
+				frenchTextGen = getXMLTextBlocks(frenchXML.getroot(), skipContents=True)
+				frenchTextGen = joinXMLTextGen(frenchTextGen)
 
 				englishXML = FA.readXMLFromDoc(docFiles[1])
-				englishTextGen = getXMLTextBlocks(englishXML, skipContents=True)
+				englishTextGen = getXMLTextBlocks(englishXML.getroot(), skipContents=True)
+				englishTextGen = joinXMLTextGen(englishTextGen)
 
-				FA.writeCSV(outputDir+d2+"_dataset.csv", zip(joinXMLTextGen(englishTextGen), joinXMLTextGen(frenchTextGen)))
+				z = []
+				for en, fr in zip(englishTextGen, frenchTextGen):
+					if "[" in en and "]" in en:
+						if en.split("[")[0].strip().lower() == fr.strip().lower():
+							en = "[".join(en.split("[")[1:])
+							en = "]".join(en.split("]")[:-1])
+					z.append((en, fr))
+
+				FA.writeCSV(outputDir + d2 + "_dataset.csv", z)
 			

@@ -333,14 +333,15 @@ class Translator:
 	
 	def translateDocument(self, path):
 		print(CONST.LAPSED_TIME())
-		root = FA.readXMLFromDoc(path)
+		tree = FA.readXMLFromDoc(path)
+		root = tree.getroot()
 
 		for textTags in PE.getXMLTextBlocks(root):
 			original = PE.joinXMLTextTags(textTags)
-			if re.search("[a-zA-Z]", original):
+			if re.search("[a-zA-Z]", original) and False:
 				translation = self.translate(original)
 				self.updateTextTags(textTags, translation)
 		
-		FA.writeUpdatedDoc(root, path, path.split(".")[0] + "_" + self.endLang + "." + path.split(".")[1])
+		FA.writeUpdatedDoc(tree, path, path.split(".")[0] + "_" + self.endLang + "." + path.split(".")[1])
 		return False
 

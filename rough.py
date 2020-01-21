@@ -325,30 +325,6 @@ def sparseDenseLayer():
 	for model in models:
 		_ = model.fit(X_train, Y_train, batch_size=128, epochs=30, verbose=2, validation_data=(X_test, Y_test))
 
-def xmlDetails():
-	import translator.processing.fileaccess as FA
-	import translator.constants as CONST
-	
-	englishPaths = [f for f in FA.getAllFilePaths(CONST.PROJECT_TRANSLATIONS_EN_PATH) if f.split(".")[-1].startswith("doc")]
-	frenchPaths = [f for f in FA.getAllFilePaths(CONST.PROJECT_TRANSLATIONS_FR_PATH) if f.split(".")[-1].startswith("doc")]
-
-	def getTags(x):
-		tags = set()
-		tags.add(x.tag.split("}")[-1])
-		for t in x:
-			tags = tags | getTags(t)
-
-		return tags
-
-	for englishPath, frenchPath in zip(englishPaths, frenchPaths):
-		root = FA.readXMLFromDoc(englishPath)
-		e = getTags(root)
-		root = FA.readXMLFromDoc(frenchPath)
-		f = getTags(root)
-
-		print(sorted(e))
-		print(e^f)
-
 def docextract():
 	from translator.processing import projextract
 	projextract.extractFilesAllDirectories()

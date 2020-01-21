@@ -7,7 +7,8 @@ from PyPDF2 import PdfFileReader
 import xml.etree.ElementTree as ET
 import zipfile
 import math
-
+import io
+import tempfile
 
 def getAllFilePaths(path):
 	paths = []
@@ -66,31 +67,38 @@ def readArchiveFile(fileName):
 	file = file.strip().split("\n")
 	return file
 	
-def writeUpdatedDoc(root, oldFilePath, newFilePath):
-	ET.register_namespace('w',"http://schemas.openxmlformats.org/wordprocessingml/2006/main")
-	ET.register_namespace('pkg',"http://schemas.microsoft.com/office/2006/xmlPackage")
+def writeUpdatedDoc(tree, oldFilePath, newFilePath):
+	root = tree.getroot()
+	for k, v in CONST.DOCX_NAMESPACES.items():
+		ET.register_namespace(k, v)
+		if k not in ["mc", "w"]:
+			root.attrib["xmlns:"+k] = v
 
 	zin = zipfile.ZipFile (oldFilePath, 'r')
 	zout = zipfile.ZipFile (newFilePath, 'w')
 	for fileInfo in zin.infolist():
 		fileData = zin.read(fileInfo.filename)
 		if (fileInfo.filename == "word/document.xml"):
-			zout.writestr(fileInfo, ET.tostring(root))
+			with tempfile.TemporaryFile() as temp:
+				temp.write(b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n')
+				tree.write(temp)
+				temp.seek(0)
+				zout.writestr(fileInfo, temp.read().decode())
 		else:
 			zout.writestr(fileInfo, fileData)
 	zout.close()
 	zin.close()
 
 def readXMLFromDoc(fileName):
-	ET.register_namespace('w',"http://schemas.openxmlformats.org/wordprocessingml/2006/main")
-	ET.register_namespace('pkg',"http://schemas.microsoft.com/office/2006/xmlPackage")
+	for k, v in CONST.DOCX_NAMESPACES.items():
+		ET.register_namespace(k, v)
 
 	docxFile = zipfile.ZipFile(fileName)
 	xml = docxFile.read("word/document.xml")
 	docxFile.close()
-	root = ET.fromstring(xml)
+	tree = ET.parse(io.StringIO(xml.decode()))
 
-	return root
+	return tree
 	
 def loadSFDData():
 	return readCSV(CONST.PROJECT_TRANSLATIONS_EXTRACT_CSV_PATH)
