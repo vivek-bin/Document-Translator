@@ -1,2 +1,4 @@
 - improve models to get reasonable accuracy
 - recurrent model merge attention at each step
+- correct transformer sampling
+- translated documents extract cleaning
