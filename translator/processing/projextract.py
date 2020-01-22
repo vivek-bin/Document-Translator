@@ -125,8 +125,18 @@ def getXMLTextBlocks(x, skipContents=False):
 	def isTag(element, tag):
 		return ((element.tag.split("}")[-1]) == tag)
 
-	if isTag(x, "p"):
-		textTags = [rt for pt in x for rt in pt if isTag(pt, "r") and (isTag(rt, "t") or isTag(rt, "tab"))]
+	if isTag(x, "p") or isTag(x, "si"):
+		textTags = []
+		for l1 in x:
+			if isTag(l1, "r"):
+				for l2 in l1:
+					if isTag(l2, "t") or isTag(l2, "tab"):
+						textTags.append(l2)
+			elif isTag(l1, "t"):
+				textTags.append(l1)
+
+
+		#textTags = [pt if isTag(pt, "t") else rt for pt in x for rt in pt if isTag(pt, "r") and (isTag(rt, "t") or isTag(rt, "tab") or isTag(pt, "t"))]
 		tabPos = [i for i, t in enumerate(textTags) if isTag(t, "tab")]
 		prevPos = 0
 		for pos in tabPos:

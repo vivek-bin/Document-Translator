@@ -9,6 +9,7 @@ import zipfile
 import math
 import io
 import tempfile
+import re
 
 def getAllFilePaths(path):
 	paths = []
@@ -73,17 +74,30 @@ def writeUpdatedDoc(tree, oldFilePath, newFilePath):
 		ET.register_namespace(k, v)
 		if k not in ["mc", "w"]:
 			root.attrib["xmlns:"+k] = v
+	extension = oldFilePath.split(".")[-1].lower()
 
 	zin = zipfile.ZipFile (oldFilePath, 'r')
 	zout = zipfile.ZipFile (newFilePath, 'w')
 	for fileInfo in zin.infolist():
 		fileData = zin.read(fileInfo.filename)
-		if (fileInfo.filename == "word/document.xml"):
+		if fileInfo.filename in ["word/document.xml", "xl/sharedStrings.xml"]:
 			with tempfile.TemporaryFile() as temp:
 				temp.write(b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n')
 				tree.write(temp)
 				temp.seek(0)
-				zout.writestr(fileInfo, temp.read().decode())
+				text = temp.read().decode()
+			if extension == "docx":
+				nameSpaces = re.findall("<w:document .*?>", fileData.decode())
+				text = re.sub("<w:document .*?>", nameSpaces[0], text, 1)
+			elif extension == "xlsx":
+				nameSpaces = re.findall("<sst .*?>", fileData.decode())
+				text = re.sub("<ns0:sst .*?>", nameSpaces[0], text, 1)
+				text = text.replace("<ns0:", "<").replace("</ns0:", "</")
+			else:
+				raise Exception("unknown document type, only docx and xlsx allowed")
+				
+			
+			zout.writestr(fileInfo, text)
 		else:
 			zout.writestr(fileInfo, fileData)
 	zout.close()
@@ -92,9 +106,14 @@ def writeUpdatedDoc(tree, oldFilePath, newFilePath):
 def readXMLFromDoc(fileName):
 	for k, v in CONST.DOCX_NAMESPACES.items():
 		ET.register_namespace(k, v)
-
+	extension = fileName.split(".")[-1].lower()
 	docxFile = zipfile.ZipFile(fileName)
-	xml = docxFile.read("word/document.xml")
+	if extension == "docx":
+		xml = docxFile.read("word/document.xml")
+	elif extension == "xlsx":
+		xml = docxFile.read("xl/sharedStrings.xml")
+	else:
+		raise Exception("unknown document type, only docx and xlsx allowed")
 	docxFile.close()
 	tree = ET.parse(io.StringIO(xml.decode()))
 

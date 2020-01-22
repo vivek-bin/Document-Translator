@@ -1,4 +1,2 @@
 - improve models to get reasonable accuracy
 - recurrent model merge attention at each step
-            > create document translation function
-            > correct SFD document read/replacement

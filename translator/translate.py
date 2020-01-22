@@ -115,7 +115,7 @@ class Translator:
 				originalWord = originalWordParts[encoderPosition]
 				if CONST.GLOSSARY_UNK_REPLACE:
 					try:
-						word = self.wordGlossary[originalWord.replace(CONST.SUBSTITUTION_CHAR_2, "")]
+						word = self.wordGlossary[originalWord.replace(CONST.SUBSTITUTION_CHAR_2, "").lower()]
 					except KeyError:
 						try:
 							word = self.wordDictionary[originalWord]
@@ -339,8 +339,13 @@ class Translator:
 		for textTags in PE.getXMLTextBlocks(root):
 			original = PE.joinXMLTextTags(textTags)
 			if re.search("[a-zA-Z]", original):
-				translation = self.translate(original)
-				self.updateTextTags(textTags, translation)
+				translation = []
+				for text in original.split("\n"):
+					if re.search("[a-zA-Z]", text):
+						translation.append(self.translate(text))
+					else:
+						translation.append(text)
+				self.updateTextTags(textTags, "\n".join(translation))
 		
 		FA.writeUpdatedDoc(tree, path, path.split(".")[0] + "_" + self.endLang + "." + path.split(".")[1])
 		return False
