@@ -2,3 +2,4 @@
 - recurrent model merge attention at each step
 - correct transformer sampling
 - translated documents extract cleaning
+- merge UNK in input?

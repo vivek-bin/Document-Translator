@@ -32,19 +32,6 @@ class Translator:
 		self.wordDictionary = FA.readDictionaryPDF()[self.startLang]
 		self.spellChecker = SpellChecker(language=endLang, distance=1)
 
-
-	def encodeData(self, data, language):
-		wordData = PD.encodeWords(data, language)
-		encodedData = [wordData]
-		if CONST.INCLUDE_CHAR_EMBEDDING:
-			charForwardData = PD.encodeCharsForward(data, language)
-			charBackwardData = PD.encodeCharsBackward(data, language)
-			encodedData.append(charForwardData)
-			encodedData.append(charBackwardData)
-
-		return encodedData
-
-
 	def encoderEncodeData(self, inputString, mergeUnk=False):
 		if CONST.GLOSSARY_UNK_REPLACE:
 			replWords = sorted(self.wordGlossary.keys(), key=lambda x: -len(x))
@@ -83,22 +70,39 @@ class Translator:
 					s = s.replace(CONST.SUBSTITUTION_CHAR, w+CONST.SUBSTITUTION_CHAR_2, 1)
 				cleanString[i] = s
 
-		data = self.encodeData(cleanString, self.startLang)
+		encodedData = []
+		encodedData.append(PD.encodeWords(cleanString, self.startLang))
+		if CONST.INCLUDE_CHAR_EMBEDDING:
+			encodedData.append(PD.encodeCharsForward(cleanString, self.startLang))
+			encodedData.append(PD.encodeCharsBackward(cleanString, self.startLang))
 
-		return cleanString, data
+		return cleanString, encodedData
 
+	def decoderStartOfSequence(self):
+		encodedData = []
+		encodedData.append(PD.encodeWords([""], self.endLang)[:,:1])
+		if CONST.INCLUDE_CHAR_EMBEDDING:
+			encodedData.append(PD.encodeCharsForward([""], self.endLang)[:,:1])
+			encodedData.append(PD.encodeCharsBackward([""], self.endLang)[:,:1])
 
-	def decoderEncodeData(self, data):
-		# data = [x for xl in data for x in xl]
-		dataEncoded = self.encodeData(data, self.endLang)
-		if len(data) == 1 and data[0] == "":			# translation started, getting START OF SEQUENCE 
-			dataEncoded = [x[:,0:1] for x in dataEncoded]
-		elif data[0].count(CONST.UNIT_SEP) == 0:		# recurrent network being used, encoding one word at a time; remove START OF SEQUENCE and END OF SEQUENCE		
-			dataEncoded = [x[:,1:2] for x in dataEncoded]
-		else:
-			dataEncoded = [x[:,:-1] for x in dataEncoded]
+		return encodedData
 
-		return dataEncoded
+	def decoderEncodeData(self, data, prevInput, prevOutput):
+		encodedData = []
+		latestWords = np.expand_dims(np.array(prevOutput), 1)
+		encodedData.append(np.concatenate((prevInput[0], latestWords), axis=1))
+		if CONST.INCLUDE_CHAR_EMBEDDING:
+			latestFChars = PD.encodeCharsForward(data, self.endLang)[:,-2:-1]
+			encodedData.append(np.concatenate((prevInput[1], latestFChars), axis=1))
+			latestBChars = PD.encodeCharsBackward(data, self.endLang)[:,-2:-1]
+			encodedData.append(np.concatenate((prevInput[2], latestBChars), axis=1))
+
+		print(encodedData[0].shape, encodedData[1].shape, encodedData[2].shape)
+
+		if self.modelNum == 1:								# recurrent network being used, only fetch latest decoded word, or SOS at start
+			encodedData = [x[:,-1:] for x in encodedData]
+		
+		return encodedData
 
 
 	def decodeWord(self, wordSoftmax, alpha, cleanString):
@@ -214,9 +218,7 @@ class Translator:
 		return outputString
 	
 
-	def sampleFirstWord(self, encoderInput):
-		decoderInput = self.decoderEncodeData([""])
-		
+	def sampleFirstWord(self, encoderInput, decoderInput):
 		# sample first word
 		outputs = self.samplingModelInit.predict_on_batch(encoderInput + decoderInput)
 		wordOut = outputs[0]
@@ -232,76 +234,66 @@ class Translator:
 		# prepare input sentence
 		cleanString, encoderInput = self.encoderEncodeData([inputString])
 		cleanString = cleanString[0]		# we only decode one sentence at a time
-		(wordSoftmax, firstAlpha), preprocessedEncoder, prevStates = self.sampleFirstWord(encoderInput)
-		startingWord, initialScore = self.decodeWord(wordSoftmax, firstAlpha, cleanString)
+		decoderInput = self.decoderStartOfSequence()
+		(wordOut, firstAlpha), preprocessedEncoder, prevStates = self.sampleFirstWord(encoderInput, decoderInput)
+		startingWord, initialScore = self.decodeWord(wordOut, firstAlpha, cleanString)
 		cumulativeScore = -np.log(initialScore)												# negated scores for sorting later	
 		
 		predictedWords = startingWord
-		nextDecoderInput = startingWord
 		alphasList = [[firstAlpha] for _ in range(CONST.BEAM_SIZE)]
-		numWords = 1
-		while numWords < CONST.MAX_TRANSLATION_LENGTH:
+		prevInput = [np.repeat(x, CONST.BEAM_SIZE, 0) for x in decoderInput]
+		prevOutput = np.argsort(-wordOut)[:CONST.BEAM_SIZE]
+		for _ in range(CONST.MAX_TRANSLATION_LENGTH - 1):
 			# decode rest of the sentences
-			decoderInput = self.decoderEncodeData(nextDecoderInput)
+			decoderInput = self.decoderEncodeData(predictedWords, prevInput, prevOutput)
 			outputs = self.samplingModelNext.predict_on_batch([preprocessedEncoder] + prevStates + decoderInput)
 			wordOut = outputs[0]
 			alphas = outputs[1]
 			prevStates = outputs[2:]
-			numWords += 1
 			
 			# decode all sampled words
 			allScores = []
 			allPredictions = []
-			endOfSequence = 0
+			allBeamsEOS = True
 			for i in range(CONST.BEAM_SIZE):
 				if CONST.END_OF_SEQUENCE_TOKEN in predictedWords[i].split(CONST.UNIT_SEP):
-					endOfSequence = endOfSequence + 1
 					alphas[i,-1] = np.zeros_like(alphas[i,-1])
 					
 					allScores.append(cumulativeScore[i] * np.ones((CONST.BEAM_SIZE,)))		# cumulate scores with existing sequences
 					allPredictions.append([CONST.MASK_TOKEN]*CONST.BEAM_SIZE)
 				else:
+					allBeamsEOS = False
 					predictedWord, score = self.decodeWord(wordOut[i,-1], alphas[i,-1], cleanString)
 					score = self.normalizeScore(score, predictedWord, alphasList[i])
 
 					allScores.append(cumulativeScore[i] + score)							# cumulate scores with existing sequences
 					allPredictions.append(predictedWord)
 
-			# if any prediction contained END OF SEQUENCE, translation finished
-			if endOfSequence == CONST.BEAM_SIZE:
-				bestSentenceIndex = np.argmin(cumulativeScore)
-				outputString = self.prepareSentences(predictedWords[bestSentenceIndex], originalText=cleanString, alphasList=alphasList[bestSentenceIndex])
-				
-				print("End of sequence >>> " + outputString)
-				return outputString
-
+			# if all predictions contained END OF SEQUENCE, translation finished
+			if allBeamsEOS:
+				break
 
 			# get highest scoring sequences
 			bestPredictions = np.argsort(np.concatenate(allScores))[:CONST.BEAM_SIZE]
 			cumulativeScore = np.concatenate(allScores)[bestPredictions]
+			bestBeams = bestPredictions // CONST.BEAM_SIZE
+			bestWordOfBeam = bestPredictions % CONST.BEAM_SIZE
 
 			# get best sequences and highest scoring words for next prediction 
-			predictedWords = [predictedWords[b//CONST.BEAM_SIZE] + CONST.UNIT_SEP + allPredictions[b//CONST.BEAM_SIZE][b%CONST.BEAM_SIZE] for b in bestPredictions]	
-			alphasList = [alphasList[b//CONST.BEAM_SIZE] + [alphas[b//CONST.BEAM_SIZE, -1]] for b in bestPredictions]
-
-			if self.modelNum == 1:
-				# LSTM model : get last word, to feed to decoder for next prediction
-				nextDecoderInput = [seq.split(CONST.UNIT_SEP)[-1] for seq in predictedWords]
-			else:
-				# TRANSFORMER model : feed current generated sequence
-				nextDecoderInput = predictedWords
-
-			# update states for next sampling according to selected best words
-			stateIndices = bestPredictions // CONST.BEAM_SIZE
-			prevStates = [p[stateIndices] for p in prevStates]
+			predictedWords = [predictedWords[b] + CONST.UNIT_SEP + allPredictions[b][w] for b, w in zip(bestBeams, bestWordOfBeam)]	
+			alphasList = [alphasList[b] + [alphas[b, -1]] for b in bestBeams]
+			prevStates = [prevState[bestBeams] for prevState in prevStates]
+			prevInput = [x[bestBeams] for x in decoderInput]
+			prevOutput = [np.argsort(-wordOut[b][-1])[w] for b, w in zip(bestBeams, bestWordOfBeam)]
 
 		completedSentences = [i for i, s in enumerate(predictedWords) if CONST.END_OF_SEQUENCE_TOKEN in s.split(CONST.UNIT_SEP)]
 		if not completedSentences:
 			print("sentence truncated!")
-			completedSentences = list(range(len(predictedWords)))
+			completedSentences = list(range(CONST.BEAM_SIZE))
 
 		bestSentenceIndex = int(np.where(cumulativeScore == np.min(cumulativeScore[completedSentences]))[0][0])
 		outputString = self.prepareSentences(wordList=predictedWords[bestSentenceIndex], originalText=cleanString, alphasList=alphasList[bestSentenceIndex])
+		print("End of sequence >>> " + outputString)
 		return outputString
 
 	def updateTextTags(self, textTags, text):
