@@ -3,7 +3,7 @@ from keras import layers
 from keras import backend as K
 import numpy as np
 
-from .. import constants as CONST
+from ... import constants as CONST
 
 def addPositionalEncoding(x):
 	from keras import backend as K

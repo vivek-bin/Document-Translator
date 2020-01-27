@@ -4,7 +4,7 @@ from keras.legacy import interfaces
 from keras import backend as K
 import warnings
 
-from .. import constants as CONST
+from ... import constants as CONST
 
 def sqrtScaleValues(x):
 	from keras import backend as K

@@ -3,7 +3,7 @@ from keras import layers
 import json
 
 from .. import constants as CONST
-from ..stages import *
+from .stages import *
 
 
 def translationLSTMAttModel():

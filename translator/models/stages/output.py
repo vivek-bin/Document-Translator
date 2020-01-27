@@ -3,7 +3,7 @@ from keras import layers
 from keras import backend as K
 from keras.engine.base_layer import InputSpec
 
-from .. import constants as CONST
+from ... import constants as CONST
 
 
 class SharedOutput(layers.Dense):
