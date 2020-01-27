@@ -50,7 +50,7 @@ def cleanLine(line, language):
 
 def splitWordStem(word, language):
 	global STEMMER
-	if re.match(r".*?\d", word):
+	if re.search(r"\d", word):
 		return [word]
 	wordStem = STEMMER[language](word)
 	if word.lower() == wordStem:
@@ -150,7 +150,7 @@ def writeEncodingsData(encodeDataToNumpy=False):
 
 def writeWordEncoding(data, language):
 	words = getWordFrequencies(data)
-	encoding = [word for word,count in words.items() if count >= CONST.MIN_WORD_COUNT and not re.match(r".*?\d",word)]
+	encoding = [word for word,count in words.items() if count >= CONST.MIN_WORD_COUNT and not re.search(r"\d",word)]
 	writeEncoding(encoding, language + "_word")
 
 def writeCharEncoding(data, language):
@@ -209,7 +209,7 @@ def encodeWords(data, language):
 			try:
 				encodedData[i,j+1] = encoding[word]
 			except KeyError:
-				encodedData[i,j+1] = encoding[CONST.ALPHANUM_UNKNOWN_TOKEN] if re.match(r".*?\d", word) else encoding[CONST.UNKNOWN_TOKEN]
+				encodedData[i,j+1] = encoding[CONST.ALPHANUM_UNKNOWN_TOKEN] if re.search(r"\d", word) else encoding[CONST.UNKNOWN_TOKEN]
 				
 		encodedData[i][j+2] = encoding[CONST.END_OF_SEQUENCE_TOKEN]
 

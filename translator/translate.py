@@ -73,8 +73,9 @@ class Translator:
 		encodedData = []
 		encodedData.append(PD.encodeWords(cleanString, self.startLang))
 		if CONST.INCLUDE_CHAR_EMBEDDING:
-			encodedData.append(PD.encodeCharsForward(cleanString, self.startLang))
-			encodedData.append(PD.encodeCharsBackward(cleanString, self.startLang))
+			cleanStringTemp = [s.replace(CONST.SUBSTITUTION_CHAR_2, "") for s in cleanString]
+			encodedData.append(PD.encodeCharsForward(cleanStringTemp, self.startLang))
+			encodedData.append(PD.encodeCharsBackward(cleanStringTemp, self.startLang))
 
 		return cleanString, encodedData
 
@@ -87,17 +88,17 @@ class Translator:
 
 		return encodedData
 
-	def decoderEncodeData(self, data, prevInput, prevOutput):
+	def decoderEncodeData(self, wordLists, prevInput, prevOutput):
 		encodedData = []
 		latestWords = np.expand_dims(np.array(prevOutput), 1)
 		encodedData.append(np.concatenate((prevInput[0], latestWords), axis=1))
 		if CONST.INCLUDE_CHAR_EMBEDDING:
-			latestFChars = PD.encodeCharsForward(data, self.endLang)[:,-2:-1]
-			encodedData.append(np.concatenate((prevInput[1], latestFChars), axis=1))
-			latestBChars = PD.encodeCharsBackward(data, self.endLang)[:,-2:-1]
-			encodedData.append(np.concatenate((prevInput[2], latestBChars), axis=1))
+			lastWord = [wordList[-1] for wordList in wordLists]
 
-		print(encodedData[0].shape, encodedData[1].shape, encodedData[2].shape)
+			latestFChars = PD.encodeCharsForward(lastWord, self.endLang)[:,-2:-1]
+			encodedData.append(np.concatenate((prevInput[1], latestFChars), axis=1))
+			latestBChars = PD.encodeCharsBackward(lastWord, self.endLang)[:,-2:-1]
+			encodedData.append(np.concatenate((prevInput[2], latestBChars), axis=1))
 
 		if self.modelNum == 1:								# recurrent network being used, only fetch latest decoded word, or SOS at start
 			encodedData = [x[:,-1:] for x in encodedData]
@@ -115,7 +116,7 @@ class Translator:
 		for wordIndex in topPredictions:
 			word = self.endLangDecoding[wordIndex]
 			if word in (CONST.UNKNOWN_TOKEN, CONST.ALPHANUM_UNKNOWN_TOKEN):
-				encoderPosition = np.argmax(alpha)
+				encoderPosition = np.argmax(alpha[1:-1]) + 1
 				originalWord = originalWordParts[encoderPosition]
 				if CONST.GLOSSARY_UNK_REPLACE:
 					try:
@@ -140,7 +141,7 @@ class Translator:
 		decodedWordCount = len(prevAlphas)
 		originalWordCount = len(prevAlphas[0]) - 2
 
-		lengthPenalty = ((5 + decodedWordCount)/(5+1))**CONST.LENGTH_PENALTY_COEFF
+		lengthPenalty = ((5 + decodedWordCount)/(5 + originalWordCount))**CONST.LENGTH_PENALTY_COEFF
 		
 		coveragePenalty = 0
 		for i in range(originalWordCount):
@@ -182,10 +183,9 @@ class Translator:
 
 		outputString = ""
 		addSpace = False
-		predictionList = wordList.split(CONST.UNIT_SEP)
-		wordPrev = capitalizeFirstLetter(predictionList[0])
+		wordPrev = capitalizeFirstLetter(wordList[0])
 
-		for i, wordPart in enumerate(predictionList[1:], 1):
+		for i, wordPart in enumerate(wordList[1:], 1):
 			if wordPart == CONST.END_OF_SEQUENCE_TOKEN:
 				break
 
@@ -194,7 +194,7 @@ class Translator:
 				continue
 			
 			# capitalization conditions
-			maxLikelihoodIndex = np.argmax(alphasList[i])
+			maxLikelihoodIndex = np.argmax(alphasList[i][1:-1]) + 1
 			originalWord = originalWords[maxLikelihoodIndex]
 			wordPart = capitalizeLikeOriginal(originalWord, wordPart)
 			if wordPrev in ["."]:
@@ -238,8 +238,8 @@ class Translator:
 		(wordOut, firstAlpha), preprocessedEncoder, prevStates = self.sampleFirstWord(encoderInput, decoderInput)
 		startingWord, initialScore = self.decodeWord(wordOut, firstAlpha, cleanString)
 		cumulativeScore = -np.log(initialScore)												# negated scores for sorting later	
-		
-		predictedWords = startingWord
+
+		predictedWords = [[s] for s in startingWord]
 		alphasList = [[firstAlpha] for _ in range(CONST.BEAM_SIZE)]
 		prevInput = [np.repeat(x, CONST.BEAM_SIZE, 0) for x in decoderInput]
 		prevOutput = np.argsort(-wordOut)[:CONST.BEAM_SIZE]
@@ -256,10 +256,10 @@ class Translator:
 			allPredictions = []
 			allBeamsEOS = True
 			for i in range(CONST.BEAM_SIZE):
-				if CONST.END_OF_SEQUENCE_TOKEN in predictedWords[i].split(CONST.UNIT_SEP):
-					alphas[i,-1] = np.zeros_like(alphas[i,-1])
+				if CONST.END_OF_SEQUENCE_TOKEN in predictedWords[i]:
+					alphas[i,-1] = 0
 					
-					allScores.append(cumulativeScore[i] * np.ones((CONST.BEAM_SIZE,)))		# cumulate scores with existing sequences
+					allScores.append(cumulativeScore[i] + np.zeros((CONST.BEAM_SIZE,)))		# cumulate scores with existing sequences
 					allPredictions.append([CONST.MASK_TOKEN]*CONST.BEAM_SIZE)
 				else:
 					allBeamsEOS = False
@@ -280,20 +280,21 @@ class Translator:
 			bestWordOfBeam = bestPredictions % CONST.BEAM_SIZE
 
 			# get best sequences and highest scoring words for next prediction 
-			predictedWords = [predictedWords[b] + CONST.UNIT_SEP + allPredictions[b][w] for b, w in zip(bestBeams, bestWordOfBeam)]	
+			predictedWords = [predictedWords[b] + [allPredictions[b][w]] for b, w in zip(bestBeams, bestWordOfBeam)]	
 			alphasList = [alphasList[b] + [alphas[b, -1]] for b in bestBeams]
 			prevStates = [prevState[bestBeams] for prevState in prevStates]
 			prevInput = [x[bestBeams] for x in decoderInput]
 			prevOutput = [np.argsort(-wordOut[b][-1])[w] for b, w in zip(bestBeams, bestWordOfBeam)]
 
-		completedSentences = [i for i, s in enumerate(predictedWords) if CONST.END_OF_SEQUENCE_TOKEN in s.split(CONST.UNIT_SEP)]
+		print("Input sequence >>> " + inputString)
+		completedSentences = [i for i, s in enumerate(predictedWords) if CONST.END_OF_SEQUENCE_TOKEN in s]
 		if not completedSentences:
 			print("sentence truncated!")
 			completedSentences = list(range(CONST.BEAM_SIZE))
 
 		bestSentenceIndex = int(np.where(cumulativeScore == np.min(cumulativeScore[completedSentences]))[0][0])
 		outputString = self.prepareSentences(wordList=predictedWords[bestSentenceIndex], originalText=cleanString, alphasList=alphasList[bestSentenceIndex])
-		print("End of sequence >>> " + outputString)
+		print("Output sequence >>> " + outputString)
 		return outputString
 
 	def updateTextTags(self, textTags, text):

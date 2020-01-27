@@ -71,7 +71,7 @@ def main():
 				frToEngTranslater.translateDocument(doc)
 		else:
 			for line in text:
-				print(frToEngTranslater.translate(line))
+				_ = frToEngTranslater.translate(line)
 		print(CONST.LAPSED_TIME())
 
 

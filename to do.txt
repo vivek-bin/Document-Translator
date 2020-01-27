@@ -1,5 +1,4 @@
 - improve models to get reasonable accuracy
-- recurrent model merge attention at each step
-- correct transformer sampling
+	- recurrent model merge attention at each timestep -> create attended RNN
 - translated documents extract cleaning
-- merge UNK in input?
+- merge UNK in input? 				----low priority
