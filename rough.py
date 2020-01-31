@@ -326,8 +326,16 @@ def sparseDenseLayer():
 		_ = model.fit(X_train, Y_train, batch_size=128, epochs=30, verbose=2, validation_data=(X_test, Y_test))
 
 def docextract():
+	import translator.constants as CONST
 	from translator.processing import projextract
-	projextract.extractFilesAllDirectories()
+	import os
+
+	for dirName in sorted(os.listdir(CONST.PROJECT_TRANSLATIONS_MATCHED_PATH)):
+		print(dirName)
+		inputDir = CONST.PROJECT_TRANSLATIONS_MATCHED_PATH + dirName + "/"
+		outputDir = CONST.PROJECT_TRANSLATIONS_EXTRACT_PATH + dirName + "/"
+
+		projextract.extractAllGroupsInDirectory(inputDir, outputDir)
 
 
 

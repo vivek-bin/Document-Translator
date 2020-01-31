@@ -168,42 +168,40 @@ def joinXMLTextTags(textTags):
 	return joinedText.strip()
 
 
-def extractFilesAllDirectories():
-	for d in sorted(os.listdir(CONST.PROJECT_TRANSLATIONS_MATCHED_PATH)):
-		print(d)
-		inputDir = CONST.PROJECT_TRANSLATIONS_MATCHED_PATH + d + "/"
-		outputDir = CONST.PROJECT_TRANSLATIONS_EXTRACT_PATH + d + "/"
 
-		for d2 in sorted(os.listdir(inputDir)):
-			inputDir2 = inputDir + d2 + "/"
-			docFiles = []
-			if not os.path.isdir(outputDir):
-				os.mkdir(outputDir)
+def extractGroup(inputDir, outputDir, group):
+	docFiles = []
+	if not os.path.isdir(outputDir):
+		os.mkdir(outputDir)
+	
+	for fileName in sorted(os.listdir(inputDir), key=lambda x:len(x)):
+		if fileName.split(".")[-1].startswith("xls"):
+			xlsData = extractFromExcel(inputDir + fileName)	 # excel files processed individually
+			FA.writeCSV(outputDir + fileName + "_dataset.csv", xlsData)
+		else:
+			docFiles.append(inputDir + fileName)
+	
+	if docFiles:
+		assert len(docFiles) == 2, str(docFiles)
+		frenchXML = FA.readXMLFromDoc(docFiles[0])
+		frenchTextGen = getXMLTextBlocks(frenchXML.getroot(), skipContents=True)
+		frenchTextGen = joinXMLTextGen(frenchTextGen)
+
+		englishXML = FA.readXMLFromDoc(docFiles[1])
+		englishTextGen = getXMLTextBlocks(englishXML.getroot(), skipContents=True)
+		englishTextGen = joinXMLTextGen(englishTextGen)
+
+		z = []
+		for en, fr in zip(englishTextGen, frenchTextGen):
+			if "[" in en and "]" in en:
+				if en.split("[")[0].strip().lower() == fr.strip().lower():
+					en = "[".join(en.split("[")[1:])
+					en = "]".join(en.split("]")[:-1])
+			z.append((en, fr))
+
+		FA.writeCSV(outputDir + group + "_dataset.csv", z)
 			
-			for fileName in sorted(os.listdir(inputDir2), key=lambda x:len(x)):
-				if fileName.split(".")[-1].startswith("xls"):
-					xlsData = extractFromExcel(inputDir2+fileName)	 # excel files processed individually
-					FA.writeCSV(outputDir+fileName+"_dataset.csv", xlsData)
-				else:
-					docFiles.append(inputDir2+fileName)
-			
-			if docFiles:
-				assert len(docFiles) == 2, str(docFiles)
-				frenchXML = FA.readXMLFromDoc(docFiles[0])
-				frenchTextGen = getXMLTextBlocks(frenchXML.getroot(), skipContents=True)
-				frenchTextGen = joinXMLTextGen(frenchTextGen)
+def extractAllGroupsInDirectory(inputDir, outputDir):
+	for group in sorted(os.listdir(inputDir)):
+		extractGroup(inputDir + group + "/", outputDir, group)
 
-				englishXML = FA.readXMLFromDoc(docFiles[1])
-				englishTextGen = getXMLTextBlocks(englishXML.getroot(), skipContents=True)
-				englishTextGen = joinXMLTextGen(englishTextGen)
-
-				z = []
-				for en, fr in zip(englishTextGen, frenchTextGen):
-					if "[" in en and "]" in en:
-						if en.split("[")[0].strip().lower() == fr.strip().lower():
-							en = "[".join(en.split("[")[1:])
-							en = "]".join(en.split("]")[:-1])
-					z.append((en, fr))
-
-				FA.writeCSV(outputDir + d2 + "_dataset.csv", z)
-			

@@ -5,7 +5,7 @@ from keras import layers
 from keras.optimizers import Adam
 import json
 import keras.backend as K
-from keras.callbacks import ModelCheckpoint, TensorBoard, LearningRateScheduler
+from keras.callbacks import ModelCheckpoint, TensorBoard, LearningRateScheduler, ReduceLROnPlateau
 import os
 from keras.utils import Sequence
 import time
@@ -202,7 +202,6 @@ def loadModel(modelNum, loadForTraining=True):
 	else:
 		trainingModel, samplingModels = translationTransformerModel()
 	if loadForTraining:
-		#trainingModel.compile(optimizer=Adam(lr=CONST.LEARNING_RATE, decay=CONST.LEARNING_RATE_DECAY/CONST.DATA_PARTITIONS), loss=CONST.LOSS_FUNCTION, metrics=[CONST.EVALUATION_METRIC])
 		trainingModel.compile(optimizer=Adam(lr=CONST.LEARNING_RATE, decay=CONST.LEARNING_RATE_DECAY/CONST.DATA_PARTITIONS), loss=sparseCrossEntropyLoss, metrics=[CONST.EVALUATION_METRIC])
 		trainingModel.summary()
 
@@ -278,7 +277,10 @@ def trainModel(modelNum, startLang="fr", endLang="en"):
 	# prepare callbacks
 	callbacks = []
 	callbacks.append(ModelCheckpoint(CONST.MODELS + trainingModel.name + CONST.MODEL_CHECKPOINT_NAME_SUFFIX, monitor=CONST.EVALUATION_METRIC, mode='max', save_best_only=True, period=CONST.CHECKPOINT_PERIOD))
-	callbacks.append(LearningRateScheduler(lrScheduler))
+	if CONST.LR_MODE == 2:
+		callbacks.append(LearningRateScheduler(lrScheduler))
+	elif CONST.LR_MODE == 1:
+		callbacks.append(ReduceLROnPlateau(monitor='val_loss', factor=CONST.REDUCE_LR_DECAY, verbose=1, patience=CONST.REDUCE_LR_PATIENCE, cooldown=CONST.REDUCE_LR_PATIENCE, min_lr=CONST.LEARNING_RATE_MIN))
 
 	if CONST.USE_TENSORBOARD:
 		callbacks.append(TensorBoard(log_dir=CONST.LOGS + "tensorboard-log", histogram_freq=1, batch_size=CONST.BATCH_SIZE, write_graph=False, write_grads=True, write_images=False))
