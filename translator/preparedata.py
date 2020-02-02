@@ -37,12 +37,15 @@ def cleanText(lines, language):
 
 	for i, line in enumerate(lines):
 		lines[i] = cleanLine(line, language)
+		if not i%100000:
+			print(language, ":", i, CONST.LAPSED_TIME())
 		
 	return lines
 
 def cleanLine(line, language):
 	line = line.replace("’","'")
-	words = [w for s in re.findall(r'\b(?=\w*?\d)\w+(?:[\W_](?=\w*?\d)\w+)*|[^\W\d_]+|[\W_]', line) for w in re.findall(r'\s+|\S+',s)]
+	words = re.findall(r"\w+|-+|\W", line)
+	#words = [w for s in re.findall(r'\b(?=\w*?\d)\w+(?:[\W_](?=\w*?\d)\w+)*|[^\W\d_]+|[\W_]', line) for w in re.findall(r'\s+|\S+',s)]
 	
 	words = [wordPart for word in words if word.strip() for wordPart in splitWordStem(word, language)]
 

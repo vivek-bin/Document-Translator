@@ -337,9 +337,32 @@ def docextract():
 
 		projextract.extractAllGroupsInDirectory(inputDir, outputDir)
 
+def trainingDataInfo():
+	import translator.constants as CONST
+	import translator.processing.fileaccess as FA
+	for lang in ["en","fr"]:
+		data = FA.readProcessedData(lang)
+		nd = {}
+		i = 0
+		t = 0
+		mn = 9999
+		mx = -1
+		for line in data:
+			count = line.count(CONST.UNIT_SEP)
+			mx = count if count > mx else mx
+			mn = count if count < mn else mn
+			i += 1
+			t += count
+			try:
+				nd[(count//10) * 10] += 1
+			except KeyError:
+				nd[(count//10) * 10] = 1
+			
+		for k in sorted(nd.keys()):
+			print(str(k).zfill(3),":",nd[k])
+		print("max={}, min={}, average={}".format(mx, mn, t/i))
 
 
 
-
-docextract()
+trainingDataInfo()
 

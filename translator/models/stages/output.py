@@ -2,6 +2,7 @@ from keras.models import Model
 from keras import layers
 from keras import backend as K
 from keras.engine.base_layer import InputSpec
+from keras.regularizers import l2
 
 from ... import constants as CONST
 
@@ -24,23 +25,25 @@ def recurrentOutputStage(outputVocabularySize=None, sharedEmbedding=None, name="
 	decoderOut = layers.Input(batch_shape=(None,None,CONST.MODEL_BASE_UNITS))
 	contextOut = layers.Input(batch_shape=(None,None,CONST.MODEL_BASE_UNITS))
 	
-	decoderOutFinal = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION))(decoderOut)
-	contextFinal = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION))(contextOut)
-	prevWordFinal = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION))(decoderEmbedding)
+	decoderOutFinal = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION)))(decoderOut)
+	contextFinal = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION)))(contextOut)
+	prevWordFinal = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION)))(decoderEmbedding)
 
 	#combine
 	wordOut = layers.Add()([contextFinal, decoderOutFinal, prevWordFinal])
-	wordOut = layers.TimeDistributed(layers.BatchNormalization())(wordOut)
-	wordOut = layers.TimeDistributed(layers.Dense(CONST.EMBEDDING_SIZE, activation=CONST.DENSE_ACTIVATION))(wordOut)
-	wordOut = layers.TimeDistributed(layers.BatchNormalization())(wordOut)
+	if CONST.BATCH_NORMALIZATION:
+		wordOut = layers.TimeDistributed(layers.BatchNormalization())(wordOut)
+	wordOut = layers.TimeDistributed(layers.Dense(CONST.EMBEDDING_SIZE, activation=CONST.DENSE_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION)))(wordOut)
+	if CONST.BATCH_NORMALIZATION:
+		wordOut = layers.TimeDistributed(layers.BatchNormalization())(wordOut)
 
 	#word prediction
 	if CONST.SHARED_INPUT_OUTPUT_EMBEDDINGS:
 		assert sharedEmbedding
-		wordOut = layers.TimeDistributed(SharedOutput(sharedEmbedding, activation="softmax"))(wordOut)
+		wordOut = layers.TimeDistributed(SharedOutput(sharedEmbedding, activation="softmax", bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION)))(wordOut)
 	else:
 		assert outputVocabularySize
-		wordOut = layers.TimeDistributed(layers.Dense(outputVocabularySize, activation="softmax"))(wordOut)
+		wordOut = layers.TimeDistributed(layers.Dense(outputVocabularySize, activation="softmax", bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION)))(wordOut)
 
 	outputStage = Model(inputs=[contextOut, decoderOut, decoderEmbedding], outputs=[wordOut], name="output"+name)
 	return outputStage
@@ -49,16 +52,17 @@ def recurrentOutputStage(outputVocabularySize=None, sharedEmbedding=None, name="
 def simpleOutputStage(outputVocabularySize=None, sharedEmbedding=None, name=""):
 	contextOut = layers.Input(batch_shape=(None,None,CONST.MODEL_BASE_UNITS))
 
-	contextFinal = layers.TimeDistributed(layers.Dense(CONST.EMBEDDING_SIZE, activation=CONST.DENSE_ACTIVATION))(contextOut)
-	contextFinal = layers.TimeDistributed(layers.BatchNormalization())(contextFinal)
+	contextFinal = layers.TimeDistributed(layers.Dense(CONST.EMBEDDING_SIZE, activation=CONST.DENSE_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION)))(contextOut)
+	if CONST.BATCH_NORMALIZATION:
+		contextFinal = layers.TimeDistributed(layers.BatchNormalization())(contextFinal)
 
 	#word prediction
 	if CONST.SHARED_INPUT_OUTPUT_EMBEDDINGS:
 		assert sharedEmbedding
-		wordOut = layers.TimeDistributed(SharedOutput(sharedEmbedding, activation="softmax"))(contextFinal)
+		wordOut = layers.TimeDistributed(SharedOutput(sharedEmbedding, activation="softmax", bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION)))(contextFinal)
 	else:
 		assert outputVocabularySize
-		wordOut = layers.TimeDistributed(layers.Dense(outputVocabularySize, activation="softmax"))(contextFinal)
+		wordOut = layers.TimeDistributed(layers.Dense(outputVocabularySize, activation="softmax", bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION)))(contextFinal)
 
 	outputStage = Model(inputs=[contextOut], outputs=[wordOut], name="output"+name)
 	return outputStage
