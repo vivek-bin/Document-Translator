@@ -32,10 +32,10 @@ def recurrentOutputStage(outputVocabularySize=None, sharedEmbedding=None, name="
 	#combine
 	wordOut = layers.Add()([contextFinal, decoderOutFinal, prevWordFinal])
 	if CONST.BATCH_NORMALIZATION:
-		wordOut = layers.TimeDistributed(layers.BatchNormalization())(wordOut)
+		wordOut = layers.TimeDistributed(layers.BatchNormalization(**CONST.BATCH_NORMALIZATION_ARGUMENTS))(wordOut)
 	wordOut = layers.TimeDistributed(layers.Dense(CONST.EMBEDDING_SIZE, activation=CONST.DENSE_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION)))(wordOut)
 	if CONST.BATCH_NORMALIZATION:
-		wordOut = layers.TimeDistributed(layers.BatchNormalization())(wordOut)
+		wordOut = layers.TimeDistributed(layers.BatchNormalization(**CONST.BATCH_NORMALIZATION_ARGUMENTS))(wordOut)
 
 	#word prediction
 	if CONST.SHARED_INPUT_OUTPUT_EMBEDDINGS:
@@ -54,7 +54,7 @@ def simpleOutputStage(outputVocabularySize=None, sharedEmbedding=None, name=""):
 
 	contextFinal = layers.TimeDistributed(layers.Dense(CONST.EMBEDDING_SIZE, activation=CONST.DENSE_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION)))(contextOut)
 	if CONST.BATCH_NORMALIZATION:
-		contextFinal = layers.TimeDistributed(layers.BatchNormalization())(contextFinal)
+		contextFinal = layers.TimeDistributed(layers.BatchNormalization(**CONST.BATCH_NORMALIZATION_ARGUMENTS))(contextFinal)
 
 	#word prediction
 	if CONST.SHARED_INPUT_OUTPUT_EMBEDDINGS:

@@ -128,6 +128,8 @@ LSTM_ACTIVATION = "tanh"
 LSTM_RECURRENT_ACTIVATION = "sigmoid"
 DENSE_ACTIVATION = lambda x: K.maximum(x, x * 0.1) # leaky relu
 
+BATCH_NORMALIZATION_ARGUMENTS = dict(momentum=0.9, trainable=True, center=True, scale=True)
+
 #recurrent model specific params
 DECODER_ENCODER_DEPTH = 4
 RECURRENT_LAYER_RESIDUALS = True
