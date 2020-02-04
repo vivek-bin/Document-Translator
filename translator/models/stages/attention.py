@@ -5,6 +5,7 @@ from keras import backend as K
 import warnings
 
 from ... import constants as CONST
+from .normalize import LayerNormalization
 
 def sqrtScaleValues(x):
 	from keras import backend as K
@@ -66,8 +67,8 @@ def basicAttentionStage(count=0):
 	valuePerm = layers.Permute((2,1))(key)
 	contextOut = layers.Dot(axes=2)([alphas, valuePerm])
 
-	if CONST.BATCH_NORMALIZATION:
-		contextOut = layers.TimeDistributed(layers.BatchNormalization(**CONST.BATCH_NORMALIZATION_ARGUMENTS))(contextOut)
+	if CONST.LAYER_NORMALIZATION:
+		contextOut = LayerNormalization(**CONST.LAYER_NORMALIZATION_ARGUMENTS)(contextOut)
 
 	attentionModel = Model(inputs=[query, key], outputs=[contextOut, alphas], name="attention_stage_"+str(count))
 	return attentionModel
@@ -101,17 +102,17 @@ def multiHeadAttentionStage(count=0, hideFuture=False, feedForward=True):
 
 	contextOut = layers.Add()([query, contextOut])
 	contextOut = layers.Reshape(target_shape=(-1, CONST.MODEL_BASE_UNITS))(contextOut)
-	if CONST.BATCH_NORMALIZATION:
-		contextOut = layers.TimeDistributed(layers.BatchNormalization(**CONST.BATCH_NORMALIZATION_ARGUMENTS))(contextOut)
+	if CONST.LAYER_NORMALIZATION:
+		contextOut = LayerNormalization(**CONST.LAYER_NORMALIZATION_ARGUMENTS)(contextOut)
 
 	if feedForward:
 		contextOutFF = layers.TimeDistributed(layers.Dense(CONST.FEED_FORWARD_UNITS, activation=CONST.DENSE_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=regularizers.l2(CONST.L2_REGULARISATION)))(contextOut)
-		if CONST.BATCH_NORMALIZATION:
-			contextOutFF = layers.TimeDistributed(layers.BatchNormalization(**CONST.BATCH_NORMALIZATION_ARGUMENTS))(contextOutFF)
+		if CONST.LAYER_NORMALIZATION:
+			contextOutFF = LayerNormalization(**CONST.LAYER_NORMALIZATION_ARGUMENTS)(contextOutFF)
 		contextOutFF = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=regularizers.l2(CONST.L2_REGULARISATION)))(contextOutFF)
 		contextOut = layers.Add()([contextOut, contextOutFF])
-		if CONST.BATCH_NORMALIZATION:
-			contextOut = layers.TimeDistributed(layers.BatchNormalization(**CONST.BATCH_NORMALIZATION_ARGUMENTS))(contextOut)
+		if CONST.LAYER_NORMALIZATION:
+			contextOut = LayerNormalization(**CONST.LAYER_NORMALIZATION_ARGUMENTS)(contextOut)
 
 	attentionModel = Model(inputs=[query, key], outputs=[contextOut, alphas], name="multihead_attention_stage_"+str(count))
 	return attentionModel

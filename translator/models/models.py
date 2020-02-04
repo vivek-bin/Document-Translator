@@ -56,16 +56,16 @@ def translationLSTMAttModel():
 	encoderOut = encoderEmbedding
 	for i in range(CONST.DECODER_ENCODER_DEPTH):
 		encoderLSTM = layers.Bidirectional(layers.LSTM(CONST.MODEL_BASE_UNITS//2, return_sequences=True, return_state=True, activation=CONST.LSTM_ACTIVATION, recurrent_activation=CONST.LSTM_RECURRENT_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION), recurrent_regularizer=l2(CONST.L2_REGULARISATION)))
-		if CONST.BATCH_NORMALIZATION:
-			encoderBatchNorm = layers.TimeDistributed(layers.BatchNormalization(**CONST.BATCH_NORMALIZATION_ARGUMENTS))
-    
 		encoderOutNext, forwardH, forwardC, backwardH, backwardC = encoderLSTM(encoderOut)
+
 		if CONST.RECURRENT_LAYER_RESIDUALS:
 			encoderOut = layers.Add()([encoderOut, encoderOutNext])
 		else:
 			encoderOut = encoderOutNext
-		if CONST.BATCH_NORMALIZATION:
-			encoderOut = encoderBatchNorm(encoderOut)
+
+		if CONST.LAYER_NORMALIZATION:
+			encoderLayerNorm = LayerNormalization(**CONST.LAYER_NORMALIZATION_ARGUMENTS)
+			encoderOut = encoderLayerNorm(encoderOut)
 
 		encoderStates.append(layers.Concatenate()([forwardH, backwardH]))
 		encoderStates.append(layers.Concatenate()([forwardC, backwardC]))
@@ -74,20 +74,20 @@ def translationLSTMAttModel():
 	decoderStates = []
 	decoderOut = decoderEmbedding
 	decoderLSTM_SHARED = []
-	decoderBatchNorm_SHARED = []
+	decoderLayerNorm_SHARED = []
 	for i in range(CONST.DECODER_ENCODER_DEPTH):
-		decoderLSTM_SHARED.append(layers.LSTM(CONST.MODEL_BASE_UNITS, return_sequences=True, return_state=True, activation=CONST.LSTM_ACTIVATION, recurrent_activation=CONST.LSTM_RECURRENT_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION), recurrent_regularizer=l2(CONST.L2_REGULARISATION)))
-		if CONST.BATCH_NORMALIZATION:
-			decoderBatchNorm_SHARED.append(layers.TimeDistributed(layers.BatchNormalization(**CONST.BATCH_NORMALIZATION_ARGUMENTS)))
-
 		initialState = encoderStates[i*2:(i+1)*2]
+		decoderLSTM_SHARED.append(layers.LSTM(CONST.MODEL_BASE_UNITS, return_sequences=True, return_state=True, activation=CONST.LSTM_ACTIVATION, recurrent_activation=CONST.LSTM_RECURRENT_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION), recurrent_regularizer=l2(CONST.L2_REGULARISATION)))
 		decoderOutNext, forwardH, forwardC = decoderLSTM_SHARED[i]([decoderOut] + initialState)
+
 		if CONST.RECURRENT_LAYER_RESIDUALS:
 			decoderOut = layers.Add()([decoderOut, decoderOutNext])
 		else:
 			decoderOut = decoderOutNext
-		if CONST.BATCH_NORMALIZATION:
-			decoderOut = decoderBatchNorm_SHARED[i](decoderOut)
+
+		if CONST.LAYER_NORMALIZATION:
+			decoderLayerNorm_SHARED.append(LayerNormalization(**CONST.LAYER_NORMALIZATION_ARGUMENTS))
+			decoderOut = decoderLayerNorm_SHARED[i](decoderOut)
 
 		decoderStates.append(forwardH)
 		decoderStates.append(forwardC)
@@ -132,8 +132,8 @@ def translationLSTMAttModel():
 			decoderOut = layers.Add()([decoderOut, decoderOutNext])
 		else:
 			decoderOut = decoderOutNext
-		if CONST.BATCH_NORMALIZATION:
-			decoderOut = decoderBatchNorm_SHARED[i](decoderOut)
+		if CONST.LAYER_NORMALIZATION:
+			decoderOut = decoderLayerNorm_SHARED[i](decoderOut)
 
 		decoderStates.append(forwardH)
 		decoderStates.append(forwardC)

@@ -5,6 +5,7 @@ from keras.engine.base_layer import InputSpec
 from keras.regularizers import l2
 
 from ... import constants as CONST
+from .normalize import LayerNormalization
 
 
 class SharedOutput(layers.Dense):
@@ -31,11 +32,11 @@ def recurrentOutputStage(outputVocabularySize=None, sharedEmbedding=None, name="
 
 	#combine
 	wordOut = layers.Add()([contextFinal, decoderOutFinal, prevWordFinal])
-	if CONST.BATCH_NORMALIZATION:
-		wordOut = layers.TimeDistributed(layers.BatchNormalization(**CONST.BATCH_NORMALIZATION_ARGUMENTS))(wordOut)
+	if CONST.LAYER_NORMALIZATION:
+		wordOut = LayerNormalization(**CONST.LAYER_NORMALIZATION_ARGUMENTS)(wordOut)
 	wordOut = layers.TimeDistributed(layers.Dense(CONST.EMBEDDING_SIZE, activation=CONST.DENSE_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION)))(wordOut)
-	if CONST.BATCH_NORMALIZATION:
-		wordOut = layers.TimeDistributed(layers.BatchNormalization(**CONST.BATCH_NORMALIZATION_ARGUMENTS))(wordOut)
+	if CONST.LAYER_NORMALIZATION:
+		wordOut = LayerNormalization(**CONST.LAYER_NORMALIZATION_ARGUMENTS)(wordOut)
 
 	#word prediction
 	if CONST.SHARED_INPUT_OUTPUT_EMBEDDINGS:
@@ -53,8 +54,8 @@ def simpleOutputStage(outputVocabularySize=None, sharedEmbedding=None, name=""):
 	contextOut = layers.Input(batch_shape=(None,None,CONST.MODEL_BASE_UNITS))
 
 	contextFinal = layers.TimeDistributed(layers.Dense(CONST.EMBEDDING_SIZE, activation=CONST.DENSE_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION)))(contextOut)
-	if CONST.BATCH_NORMALIZATION:
-		contextFinal = layers.TimeDistributed(layers.BatchNormalization(**CONST.BATCH_NORMALIZATION_ARGUMENTS))(contextFinal)
+	if CONST.LAYER_NORMALIZATION:
+		contextFinal = LayerNormalization(**CONST.LAYER_NORMALIZATION_ARGUMENTS)(contextFinal)
 
 	#word prediction
 	if CONST.SHARED_INPUT_OUTPUT_EMBEDDINGS:

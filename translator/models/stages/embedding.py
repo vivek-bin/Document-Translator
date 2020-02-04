@@ -5,6 +5,7 @@ from keras.regularizers import l2
 import numpy as np
 
 from ... import constants as CONST
+from .normalize import LayerNormalization
 
 def addPositionalEncoding(x):
 	from keras import backend as K
@@ -18,13 +19,13 @@ def embeddingStage(VOCABULARY_COUNT, name, addPositionalEmbedding=False):
 
 	#interface with the rest of the model
 	embedding = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION)))(embedding)
-	if CONST.BATCH_NORMALIZATION:
-		embedding = layers.TimeDistributed(layers.BatchNormalization(**CONST.BATCH_NORMALIZATION_ARGUMENTS))(embedding)
+	if CONST.LAYER_NORMALIZATION:
+		embedding = LayerNormalization(**CONST.LAYER_NORMALIZATION_ARGUMENTS)(embedding)
 
 	if addPositionalEmbedding:
 		embedding = layers.Lambda(addPositionalEncoding)(embedding)
-		if CONST.BATCH_NORMALIZATION:
-			embedding = layers.TimeDistributed(layers.BatchNormalization(**CONST.BATCH_NORMALIZATION_ARGUMENTS))(embedding)
+		if CONST.LAYER_NORMALIZATION:
+			embedding = LayerNormalization(**CONST.LAYER_NORMALIZATION_ARGUMENTS)(embedding)
 	
 	embeddingModel = Model(inputs=[wordInput], outputs=[embedding], name="embedding_"+name)
 	return embeddingModel
@@ -46,13 +47,13 @@ def wordCharEmbeddingStage(VOCABULARY_COUNT, CHAR_VOCABULARY_COUNT, name, addPos
 
 	#interface with the rest of the model
 	embedding = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION)))(embedding)
-	if CONST.BATCH_NORMALIZATION:
-		embedding = layers.TimeDistributed(layers.BatchNormalization(**CONST.BATCH_NORMALIZATION_ARGUMENTS))(embedding)
+	if CONST.LAYER_NORMALIZATION:
+		embedding = LayerNormalization(**CONST.LAYER_NORMALIZATION_ARGUMENTS)(embedding)
 
 	if addPositionalEmbedding:
 		embedding = layers.Lambda(addPositionalEncoding)(embedding)
-		if CONST.BATCH_NORMALIZATION:
-			embedding = layers.TimeDistributed(layers.BatchNormalization(**CONST.BATCH_NORMALIZATION_ARGUMENTS))(embedding)
+		if CONST.LAYER_NORMALIZATION:
+			embedding = LayerNormalization(**CONST.LAYER_NORMALIZATION_ARGUMENTS)(embedding)
 	
 	embeddingModel = Model(inputs=[wordInput, charForwardInput, charBackwardInput], outputs=[embedding], name="embedding_"+name)
 	return embeddingModel
