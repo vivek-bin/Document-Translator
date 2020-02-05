@@ -37,21 +37,18 @@ def readData():
 	return fr, en
 
 def readLangData(lang):
-	ep = FA.loadStandard(CONST.EUROPARL, (lang,))[0]
-	cc = FA.loadStandard(CONST.COMMON_CRAWL, (lang,))[0]
-	pc = FA.loadStandard(CONST.PARA_CRAWL, (lang,))[0]
+	data = []
+	data += FA.loadStandard(CONST.EUROPARL, (lang,))[0]
+	data += FA.loadStandard(CONST.COMMON_CRAWL, (lang,))[0]
+	data += FA.loadStandard(CONST.PARA_CRAWL, (lang,))[0]
 
 	if lang == "fr":
-		ha = FA.loadHansards()[0]
-		fe = FA.loadFraEng()[0]
+		data += FA.loadHansards()[0]
+		data += FA.loadFraEng()[0]
 	elif lang == "en":
-		ha = FA.loadHansards()[1]
-		fe = FA.loadFraEng()[1]
-	else:
-		ha = []
-		fe = []
+		data += FA.loadHansards()[1]
+		data += FA.loadFraEng()[1]
 
-	data = ha + fe + ep + cc + pc
 	print(lang, "text read from disk")
 	print(CONST.LAPSED_TIME())
 
