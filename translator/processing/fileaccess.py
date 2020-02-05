@@ -128,9 +128,9 @@ def loadSFDData():
 	return readCSV(CONST.PROJECT_TRANSLATIONS_EXTRACT_CSV_PATH)
 
 def loadStandard(name, langs):
-	data = (readFile(CONST.DATA + name + "." + lang) for lang in langs)
+	data = tuple(readFile(CONST.DATA + name + "." + lang) for lang in langs)
 
-	lens = (len(d) for d in data)
+	lens = tuple(len(d) for d in data)
 
 	if min(lens) != max(lens):
 		raise Exception(name + " corpus lengths mismatch! " + str(lens))
