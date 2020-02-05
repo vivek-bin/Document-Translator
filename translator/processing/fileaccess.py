@@ -42,16 +42,21 @@ def writeCSV(fileName, rows, mode="a"):
 		for row in rows:
 			writer.writerow(row)
 
-def writeProcessedData(data, fileName):
+def writeProcessedData(data, fileName, order=None):
 	with open(CONST.PROCESSED_DATA + fileName + ".txt", "w", encoding="utf-8") as f:
-		for line in data:
-			f.write(line + "\n")
+		if order is None:
+			for line in data:
+				f.write(line + "\n")
+		else:
+			assert len(data) >= len(order)
+			for i in order:
+				f.write(data[i] + "\n")
 
 def readProcessedData(fileName, startPos=0, endPos=CONST.DATA_COUNT):
 	assert startPos < CONST.DATA_COUNT
 	assert endPos <= CONST.DATA_COUNT
 	with open(CONST.PROCESSED_DATA + fileName + ".txt", encoding="utf8") as f:
-		lines = [line.strip() for i, line in enumerate(f) if i >= startPos and i < endPos]
+		lines = [line.rstrip() for i, line in enumerate(f) if i >= startPos and i < endPos]
 
 	return lines
 
@@ -122,15 +127,16 @@ def readXMLFromDoc(fileName):
 def loadSFDData():
 	return readCSV(CONST.PROJECT_TRANSLATIONS_EXTRACT_CSV_PATH)
 
-def loadStandard(name):
-	fileFr = readFile(CONST.DATA + name + ".fr")
-	fileEn = readFile(CONST.DATA + name + ".en")
+def loadStandard(name, langs):
+	data = (readFile(CONST.DATA + name + "." + lang) for lang in langs)
 
-	if len(fileEn) != len(fileFr):
-		raise Exception("{0} corpus lengths mismatch! en:{1} vs fr:{2}".format(name, len(fileEn), len(fileFr)))
+	lens = (len(d) for d in data)
 
-	print(name + " length = "+str(len(fileEn)))
-	return fileFr, fileEn
+	if min(lens) != max(lens):
+		raise Exception(name + " corpus lengths mismatch! " + str(lens))
+
+	print(name, "length =", lens[0])
+	return data
 	
 	
 def loadHansards():

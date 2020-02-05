@@ -280,7 +280,7 @@ def trainModel(modelNum, startLang="fr", endLang="en"):
 	if CONST.LR_MODE == 2:
 		callbacks.append(LearningRateScheduler(lrScheduler))
 	elif CONST.LR_MODE == 1:
-		callbacks.append(ReduceLROnPlateau(monitor='val_loss', factor=CONST.REDUCE_LR_DECAY, verbose=1, patience=CONST.REDUCE_LR_PATIENCE, cooldown=CONST.REDUCE_LR_PATIENCE, min_lr=CONST.LEARNING_RATE_MIN))
+		callbacks.append(ReduceLROnPlateau(monitor='val_loss', min_delta=0.01, factor=CONST.REDUCE_LR_DECAY, verbose=1, patience=CONST.REDUCE_LR_PATIENCE, cooldown=CONST.REDUCE_LR_PATIENCE, min_lr=CONST.LEARNING_RATE_MIN))
 
 	if CONST.USE_TENSORBOARD:
 		callbacks.append(TensorBoard(log_dir=CONST.LOGS + "tensorboard-log", histogram_freq=1, batch_size=CONST.BATCH_SIZE, write_graph=False, write_grads=True, write_images=False))

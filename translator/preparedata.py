@@ -9,6 +9,7 @@ import numpy as np
 from random import shuffle
 from nltk.stem import SnowballStemmer
 from os.path import commonprefix
+import gc
 
 STEMMER = {}
 STEMMER["en"] = SnowballStemmer("english").stem
@@ -16,21 +17,49 @@ STEMMER["fr"] = SnowballStemmer("french").stem
 
 #reading and cleaning the data
 def readData():
-	epFr, epEn = FA.loadStandard(CONST.EUROPARL)
-	ccFr, ccEn = FA.loadStandard(CONST.COMMON_CRAWL)
+	epFr, epEn = FA.loadStandard(CONST.EUROPARL, ("fr", "en"))
+	ccFr, ccEn = FA.loadStandard(CONST.COMMON_CRAWL, ("fr", "en"))
+	pcFr, pcEn = FA.loadStandard(CONST.PARA_CRAWL, ("fr", "en"))
 	haFr, haEn = FA.loadHansards()
 	feFr, feEn = FA.loadFraEng()
-	fr = haFr + epFr + feFr + ccFr
-	en = haEn + epEn + feEn + ccEn
+	fr = haFr + epFr + feFr + ccFr + pcFr
+	en = haEn + epEn + feEn + ccEn + pcEn
 
-	frEn = list(zip(fr,en))
-	shuffle(frEn)
-	fr = [frLine for frLine, enLine in frEn]
-	en = [enLine for frLine, enLine in frEn]
-	
 	print("text read from disk")
 	print(CONST.LAPSED_TIME())
+
+	cleanText(fr, "fr")
+	cleanText(en, "en")
+
+	print("text clean finished")
+	print(CONST.LAPSED_TIME())
+
 	return fr, en
+
+def readLangData(lang):
+	ep = FA.loadStandard(CONST.EUROPARL, (lang,))[0]
+	cc = FA.loadStandard(CONST.COMMON_CRAWL, (lang,))[0]
+	pc = FA.loadStandard(CONST.PARA_CRAWL, (lang,))[0]
+
+	if lang == "fr":
+		ha = FA.loadHansards()[0]
+		fe = FA.loadFraEng()[0]
+	elif lang == "en":
+		ha = FA.loadHansards()[1]
+		fe = FA.loadFraEng()[1]
+	else:
+		ha = []
+		fe = []
+
+	data = ha + fe + ep + cc + pc
+	print(lang, "text read from disk")
+	print(CONST.LAPSED_TIME())
+
+	cleanText(data, lang)
+	print(lang, "text clean finished")
+	print(CONST.LAPSED_TIME())
+
+	return data
 
 def cleanText(lines, language):
 	assert type(lines) is list
@@ -39,13 +68,10 @@ def cleanText(lines, language):
 		lines[i] = cleanLine(line, language)
 		if not i%100000:
 			print(language, ":", i, CONST.LAPSED_TIME())
-		
-	return lines
-
+	
 def cleanLine(line, language):
 	line = line.replace("’","'")
-	words = re.findall(r"\w+|-+|\W", line)
-	#words = [w for s in re.findall(r'\b(?=\w*?\d)\w+(?:[\W_](?=\w*?\d)\w+)*|[^\W\d_]+|[\W_]', line) for w in re.findall(r'\s+|\S+',s)]
+	words = re.findall(r"\w+|-+|\.+|\W", line)
 	
 	words = [wordPart for word in words if word.strip() for wordPart in splitWordStem(word, language)]
 
@@ -64,29 +90,14 @@ def splitWordStem(word, language):
 		wordTrail = CONST.WORD_STEM_TRAIL_IDENTIFIER + word[commonPrefixLen:]
 		return [wordStemOrig, wordTrail]
 
-def limitSentenceSize(fileFr,fileEn):
-	maxWordsFr = [i for i,line in enumerate(fileFr) if line.count(CONST.UNIT_SEP) >= CONST.MAX_WORDS]
-	maxWordsEn = [i for i,line in enumerate(fileEn) if line.count(CONST.UNIT_SEP) >= CONST.MAX_WORDS]
-	maxWordLines = set(maxWordsFr) | set(maxWordsEn)
+def unusualSentenceIndices(data):
+	dataCharFreq = getCharacterFrequencies(data)
+	rareChars = set([ch for ch, count in dataCharFreq.items() if count < CONST.RARE_CHAR_COUNT])
+	rareCharLines = [i for i, line in enumerate(data) if set(line) & rareChars]
 
-	fileFr2 = [line for i, line in enumerate(fileFr) if i not in maxWordLines]
-	fileEn2 = [line for i, line in enumerate(fileEn) if i not in maxWordLines]
-	
-	return fileFr2, fileEn2
+	longLines = [i for i,line in enumerate(data) if line.count(CONST.UNIT_SEP) >= CONST.MAX_WORDS]
 
-def cleanRareChars(fr, en):
-	frChars = getCharacterFrequencies(fr)
-	enChars = getCharacterFrequencies(en)
-
-	frCharsRare = [ch for ch, count in frChars.items() if count < CONST.RARE_CHAR_COUNT]
-	enCharsRare = [ch for ch, count in enChars.items() if count < CONST.RARE_CHAR_COUNT]
-	rareChars = set(frCharsRare) & set(enCharsRare)
-	removeLinesNumbers = set([i for i, line in enumerate(fr) if set(line) & rareChars] + [i for i, line in enumerate(en) if set(line) & rareChars])
-	fr = [l for i,l in enumerate(fr) if i not in removeLinesNumbers]
-	en = [l for i,l in enumerate(en) if i not in removeLinesNumbers]
-
-	print("size of data : " +str(len(fr)))
-	return fr, en
+	return set(rareCharLines) | set(longLines)
 	
 
 def getCharacterFrequencies(file):
@@ -116,40 +127,38 @@ def getWordFrequencies(file):
 
 	return wordDict
 
+def preProcessWriteData(lang):
+	data = readLangData(lang)
+	removeLinesIndices = unusualSentenceIndices(data)
+	FA.writeProcessedData(data, lang+"-temp")
+
+	return set(range(len(data))) - removeLinesIndices
 
 # write encodings and encoded data to disk
-def writeEncodingsData(encodeDataToNumpy=False):
-	fr, en = readData()
-
-	fr = cleanText(fr, "fr")
-	en = cleanText(en, "en")
-
-	print("text clean finished")
-	print(CONST.LAPSED_TIME())
-
-	fr, en = limitSentenceSize(fr, en)
-	fr, en = cleanRareChars(fr, en)
-
-	print("text ready for encoding")
-	print(CONST.LAPSED_TIME())
-
-	# write word encoding to file
-	writeWordEncoding(fr, "fr")
-	writeWordEncoding(en, "en")
-	if CONST.INCLUDE_CHAR_EMBEDDING:
-		# write character encoding to file
-		writeCharEncoding(fr, "fr")
-		writeCharEncoding(en, "en")
+def writeAllData():
+	writeLinesIndicesFr = preProcessWriteData("fr")
+	gc.collect()
+	writeLinesIndicesEn = preProcessWriteData("en")
+	gc.collect()
 	
-	if encodeDataToNumpy:
-		writeEncodedData(fr, "fr")
-		writeEncodedData(en, "en")
-		print("encoding and encoded text saved to disk")
-	else:
-		FA.writeProcessedData(fr, "fr")
-		FA.writeProcessedData(en, "en")
-		print("cleaned text saved to disk, not encoded")
+	order = list(writeLinesIndicesFr & writeLinesIndicesEn)
+	shuffle(order)
+
+	FA.writeProcessedData(FA.readProcessedData("fr-temp"), "fr", order)
+	gc.collect()
+	FA.writeProcessedData(FA.readProcessedData("en-temp"), "en", order)
+	gc.collect()
+	print("cleaned text saved to disk, not encoded")
 	print(CONST.LAPSED_TIME())
+
+def writeEncodingFromProcessed(lang):
+	data = FA.readProcessedData(lang)
+
+	writeWordEncoding(data, lang)
+	if CONST.INCLUDE_CHAR_EMBEDDING:
+		writeCharEncoding(data, lang)
+	
+	print(lang, "encodings written to disk")
 
 def writeWordEncoding(data, language):
 	words = getWordFrequencies(data)
@@ -297,7 +306,9 @@ def writeDataDetailsToLog(fr, en):
 	charExamples(en, fr)
 	
 def main():
-	writeEncodingsData()
+	writeAllData()
+	writeEncodingFromProcessed("fr")
+	writeEncodingFromProcessed("en")
 
 
 

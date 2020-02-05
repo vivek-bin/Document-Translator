@@ -49,8 +49,10 @@ def main():
 		pass
 
 	if prepareDataFlag:
-		from translator.preparedata import writeEncodingsData
-		writeEncodingsData()
+		from translator.preparedata import writeAllData, writeEncodingFromProcessed
+		writeAllData()
+		writeEncodingFromProcessed("fr")
+		writeEncodingFromProcessed("en")
 
 	if trainModelFlag:
 		assert modelNum in [1, 2]
