@@ -92,7 +92,7 @@ def unusualSentenceIndices(data):
 	rareChars = set([ch for ch, count in dataCharFreq.items() if count < CONST.RARE_CHAR_COUNT])
 	rareCharLines = [i for i, line in enumerate(data) if set(line) & rareChars]
 
-	longLines = [i for i,line in enumerate(data) if line.count(CONST.UNIT_SEP) >= CONST.MAX_WORDS]
+	longLines = [i for i,line in enumerate(data) if CONST.NUM_WORDPIECES(line) >= CONST.MAX_WORDS]
 
 	return set(rareCharLines) | set(longLines)
 	
@@ -156,6 +156,7 @@ def writeEncodingFromProcessed(lang):
 		writeCharEncoding(data, lang)
 	
 	print(lang, "encodings written to disk")
+	print(CONST.LAPSED_TIME())
 
 def writeWordEncoding(data, language):
 	words = getWordFrequencies(data)
@@ -206,7 +207,7 @@ def writeEncodedData(data, language):
 
 # encode the data
 def encodeWords(data, language):
-	maxSequenceLenth = max([line.count(CONST.UNIT_SEP)+1 for line in data]) + 2		#start and end of sequence
+	maxSequenceLenth = max([CONST.NUM_WORDPIECES(line)+1 for line in data]) + 2		#start and end of sequence
 	encodedData = np.zeros((len(data), maxSequenceLenth),dtype="uint16")			#initialize zero array
 
 	with open(CONST.ENCODINGS+language+"_word.json", "r") as f:
@@ -237,7 +238,7 @@ def encodeCharsBackward(data, language):
 	return encodedData
 
 def encodeChars(data, language):
-	maxSequenceLenth = max([line.count(CONST.UNIT_SEP)+1 for line in data]) + 2					#start and end of sequence
+	maxSequenceLenth = max([CONST.NUM_WORDPIECES(line)+1 for line in data]) + 2					#start and end of sequence
 	encodedData = np.zeros((len(data), maxSequenceLenth, CONST.CHAR_INPUT_SIZE),dtype="uint8")		#initialize zero array
 
 	with open(CONST.ENCODINGS+language+"_char.json", "r") as f:

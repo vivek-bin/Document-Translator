@@ -10,6 +10,7 @@ import os
 from keras.utils import Sequence
 import time
 import h5py
+from random import shuffle
 
 from . import constants as CONST
 from . import preparedata as PD
@@ -123,9 +124,9 @@ class DataPartitionLoadingSequence(Sequence):
 		self.startLangText = FA.readProcessedData(self.startLang, partitionOffset + self.dataPartStart, partitionOffset + self.dataPartEnd)
 		self.endLangText = FA.readProcessedData(self.endLang, partitionOffset + self.dataPartStart, partitionOffset + self.dataPartEnd)
 		data = list(zip(self.startLangText, self.endLangText))
-		data.sort(key=lambda x:len(x[1]))
-		self.startLangText = [ls for ls, le in data]
-		self.endLangText = [le for ls, le in data]
+		shuffle(data)
+		data.sort(key=lambda x:CONST.NUM_WORDPIECES(x[1]))
+		self.startLangText, self.endLangText = zip(*data)
 
 
 def sparseCrossEntropyLoss(targets=None, outputs=None):
@@ -142,8 +143,8 @@ def sparseCrossEntropyLoss(targets=None, outputs=None):
 		relevantValues = K.gather(K.flatten(outputs), shiftedtargets)
 		relevantValues = K.reshape(relevantValues, (batchSize, -1))
 		otherValues = K.sum(outputs, axis=-1) - relevantValues
-		trueValue = (1. * CONST.LABEL_SMOOTHENING) + ((1.-CONST.LABEL_SMOOTHENING)/K.cast(vocabularySize,dtype="float32"))
-		falseValue = (0. * CONST.LABEL_SMOOTHENING) + ((1.-CONST.LABEL_SMOOTHENING)/K.cast(vocabularySize,dtype="float32"))
+		trueValue = (1. * CONST.LABEL_SMOOTHENING) + ((1.-CONST.LABEL_SMOOTHENING)/K.cast(vocabularySize,dtype=K.dtype(outputs)))
+		falseValue = (0. * CONST.LABEL_SMOOTHENING) + ((1.-CONST.LABEL_SMOOTHENING)/K.cast(vocabularySize,dtype=K.dtype(outputs)))
 		cost = relevantValues*trueValue + otherValues*falseValue
 	else:
 		relevantValues = K.gather(K.flatten(outputs), shiftedtargets)

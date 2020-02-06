@@ -9,7 +9,7 @@ from .normalize import LayerNormalization
 
 def sqrtScaleValues(x):
 	from keras import backend as K
-	scale = K.sqrt(K.cast(CONST.ATTENTION_UNITS, "float32"))
+	scale = K.sqrt(K.cast(CONST.ATTENTION_UNITS, K.dtype(x)))
 	return x/scale
 
 def hideFutureSteps(x):
@@ -18,10 +18,10 @@ def hideFutureSteps(x):
 	m = K.arange(K.shape(x)[1])
 	m1 = K.tile(K.expand_dims(m, 0), [K.shape(x)[1], 1])
 	m2 = K.tile(K.expand_dims(m, 1), [1, K.shape(x)[1]])
-	mask = K.cast(K.greater_equal(m2, m1), "float32")
+	mask = K.cast(K.greater_equal(m2, m1), K.dtype(x))
 	mask = K.tile(K.expand_dims(mask, 0), [K.shape(x)[0], 1, 1])
 
-	lowValue = K.cast(K.less(m2, m1), "float32") * K.cast(-2**15, "float32")
+	lowValue = K.cast(K.less(m2, m1), K.dtype(x)) * K.cast(-2**15, K.dtype(x))
 	lowValue = K.tile(K.expand_dims(lowValue, 0), [K.shape(x)[0], 1, 1])
 
 	return (x * mask) + lowValue

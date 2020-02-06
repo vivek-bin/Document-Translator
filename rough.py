@@ -348,7 +348,7 @@ def trainingDataInfo():
 		mn = 9999
 		mx = -1
 		for line in data:
-			count = line.count(CONST.UNIT_SEP)
+			count = CONST.NUM_WORDPIECES(line)
 			mx = count if count > mx else mx
 			mn = count if count < mn else mn
 			i += 1
