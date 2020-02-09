@@ -1,6 +1,7 @@
 import json
 import numpy as np
 import re
+import copy
 from spellchecker import SpellChecker
 
 from . import constants as CONST
@@ -61,7 +62,8 @@ class Translator:
 				replacedSubString.append(replacedWord)
 			inputString = replacedString
 
-		cleanString = PD.cleanText(inputString, self.startLang)
+		cleanString = copy.deepcopy(inputString)
+		PD.cleanText(cleanString, self.startLang)
 
 		if CONST.GLOSSARY_UNK_REPLACE:
 			for i in range(len(cleanString)):
