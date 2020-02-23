@@ -1,6 +1,6 @@
-from keras.models import Model
-from keras import layers
-from keras.regularizers import l2
+from tensorflow.keras.models import Model
+from tensorflow.keras import layers
+from tensorflow.keras.regularizers import l2
 import json
 
 from .. import constants as CONST

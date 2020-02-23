@@ -1,19 +1,19 @@
-from keras.models import Model
-from keras import layers, regularizers, activations, initializers, constraints
-from keras.legacy import interfaces
-from keras import backend as K
+from tensorflow.keras.models import Model
+from tensorflow.keras import layers, regularizers, activations, initializers, constraints
+#from tensorflow.keras.legacy import interfaces
+from tensorflow.keras import backend as K
 import warnings
 
 from ... import constants as CONST
 from .normalize import LayerNormalization
 
 def sqrtScaleValues(x):
-	from keras import backend as K
+	from tensorflow.keras import backend as K
 	scale = K.sqrt(K.cast(CONST.ATTENTION_UNITS, K.dtype(x)))
 	return x/scale
 
 def hideFutureSteps(x):
-	from keras import backend as K
+	from tensorflow.keras import backend as K
 
 	m = K.arange(K.shape(x)[1])
 	m1 = K.tile(K.expand_dims(m, 0), [K.shape(x)[1], 1])
@@ -223,7 +223,7 @@ class AttLSTM(layers.RNN):
 		   Recurrent Neural Networks](https://arxiv.org/abs/1512.05287)
 	"""
 
-	@interfaces.legacy_recurrent_support
+	# @interfaces.legacy_recurrent_support
 	def __init__(self, units,
 				 activation='tanh',
 				 recurrent_activation='hard_sigmoid',

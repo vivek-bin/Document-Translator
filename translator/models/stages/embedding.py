@@ -1,15 +1,20 @@
-from keras.models import Model
-from keras import layers
-from keras import backend as K
-from keras.regularizers import l2
+from tensorflow.keras.models import Model
+from tensorflow.keras import layers
+from tensorflow.keras import backend as K
+from tensorflow.keras.regularizers import l2
 import numpy as np
 
 from ... import constants as CONST
 from .normalize import LayerNormalization
 
-def addPositionalEncoding(x):
-	from keras import backend as K
-	return x + K.variable(CONST.MAX_POSITIONAL_EMBEDDING)[0:K.shape(x)[1], 0:K.shape(x)[2]]
+class PositionalEncoding(layers.Layer):
+	def __init__(self, **kwargs):
+		self.positional = K.variable(CONST.MAX_POSITIONAL_EMBEDDING)
+		super(PositionalEncoding, self).__init__(**kwargs)
+
+	def call(self, inputs):
+		outputs = inputs + self.positional[0:K.shape(inputs)[1], 0:K.shape(inputs)[2]]
+		return outputs
 
 
 def embeddingStage(VOCABULARY_COUNT, name, addPositionalEmbedding=False):
@@ -23,7 +28,7 @@ def embeddingStage(VOCABULARY_COUNT, name, addPositionalEmbedding=False):
 		embedding = LayerNormalization(**CONST.LAYER_NORMALIZATION_ARGUMENTS)(embedding)
 
 	if addPositionalEmbedding:
-		embedding = layers.Lambda(addPositionalEncoding)(embedding)
+		embedding = PositionalEncoding()(embedding)
 		if CONST.LAYER_NORMALIZATION:
 			embedding = LayerNormalization(**CONST.LAYER_NORMALIZATION_ARGUMENTS)(embedding)
 	
@@ -51,7 +56,7 @@ def wordCharEmbeddingStage(VOCABULARY_COUNT, CHAR_VOCABULARY_COUNT, name, addPos
 		embedding = LayerNormalization(**CONST.LAYER_NORMALIZATION_ARGUMENTS)(embedding)
 
 	if addPositionalEmbedding:
-		embedding = layers.Lambda(addPositionalEncoding)(embedding)
+		embedding = PositionalEncoding()(embedding)
 		if CONST.LAYER_NORMALIZATION:
 			embedding = LayerNormalization(**CONST.LAYER_NORMALIZATION_ARGUMENTS)(embedding)
 	

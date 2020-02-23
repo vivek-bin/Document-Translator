@@ -1,7 +1,7 @@
-from keras import layers, regularizers, activations, initializers, constraints
-from keras.legacy import interfaces
-from keras import backend as K
-from keras.engine.base_layer import InputSpec
+from tensorflow.keras import layers, regularizers, activations, initializers, constraints
+#from tensorflow.keras.legacy import interfaces
+from tensorflow.keras import backend as K
+from tensorflow.keras.layers import InputSpec
 
 from ... import constants as CONST
 
@@ -33,14 +33,12 @@ class LayerNormalization(layers.Layer):
 
     # Input shape
         Arbitrary. Use the keyword argument `input_shape`
-        (tuple of integers, does not include the samples axis)
-        when using this layer as the first layer in a model.
-
+        (tuple of integerinterfaces
     # Output shape
         Same shape as input.
     """
 
-    @interfaces.legacy_batchnorm_support
+    #@interfaces.legacy_batchnorm_support
     def __init__(self,
                  epsilon=1e-3,
                  center=True,

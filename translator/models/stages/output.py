@@ -1,8 +1,8 @@
-from keras.models import Model
-from keras import layers
-from keras import backend as K
-from keras.engine.base_layer import InputSpec
-from keras.regularizers import l2
+from tensorflow.keras.models import Model
+from tensorflow.keras import layers
+from tensorflow.keras import backend as K
+from tensorflow.keras.layers import InputSpec
+from tensorflow.keras.regularizers import l2
 
 from ... import constants as CONST
 from .normalize import LayerNormalization

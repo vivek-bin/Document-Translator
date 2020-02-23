@@ -1,13 +1,12 @@
 import numpy as np
-from keras.models import load_model
-from keras.models import Model
-from keras import layers
-from keras.optimizers import Adam
+from tensorflow.keras.models import load_model, Model
+from tensorflow.keras import layers
+from tensorflow.keras.optimizers import Adam
 import json
-import keras.backend as K
-from keras.callbacks import ModelCheckpoint, TensorBoard, LearningRateScheduler, ReduceLROnPlateau
+import tensorflow.keras.backend as K
+from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, LearningRateScheduler, ReduceLROnPlateau
 import os
-from keras.utils import Sequence
+from tensorflow.keras.utils import Sequence
 import time
 import h5py
 from random import shuffle
