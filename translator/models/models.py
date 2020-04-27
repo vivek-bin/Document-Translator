@@ -7,16 +7,16 @@ from .. import constants as CONST
 from .stages import *
 
 
-def translationLSTMAttModel():
+def translationLSTMAttModel(startLang, endLang):
 	## get vocabulary sizes to build model
-	with open(CONST.ENCODINGS+"fr_word.json", "r") as f:
+	with open(CONST.ENCODINGS+startLang+"_word.json", "r") as f:
 		INPUT_VOCABULARY_COUNT = len(json.load(f))
-	with open(CONST.ENCODINGS+"en_word.json", "r") as f:
+	with open(CONST.ENCODINGS+endLang+"_word.json", "r") as f:
 		OUTPUT_VOCABULARY_COUNT = len(json.load(f))
 	if CONST.INCLUDE_CHAR_EMBEDDING:
-		with open(CONST.ENCODINGS+"fr_char.json", "r") as f:
+		with open(CONST.ENCODINGS+startLang+"_char.json", "r") as f:
 			INPUT_CHAR_VOCABULARY_COUNT = len(json.load(f))
-		with open(CONST.ENCODINGS+"en_char.json", "r") as f:
+		with open(CONST.ENCODINGS+endLang+"_char.json", "r") as f:
 			OUTPUT_CHAR_VOCABULARY_COUNT = len(json.load(f))
 	
 
@@ -104,7 +104,7 @@ def translationLSTMAttModel():
 		outputStage_SHARED = recurrentOutputStage(outputVocabularySize=OUTPUT_VOCABULARY_COUNT)
 	wordOut = outputStage_SHARED([contextOut, decoderOut, decoderEmbedding])
 
-	trainingModel = Model(inputs=encoderInput + decoderInput, outputs=wordOut, name="AttLSTM")
+	trainingModel = Model(inputs=encoderInput + decoderInput, outputs=wordOut, name="AttLSTM-"+startLang+"-to-"+endLang)
 	
 
 	################################
@@ -147,16 +147,16 @@ def translationLSTMAttModel():
 
 
 
-def translationTransformerModel():
+def translationTransformerModel(startLang, endLang):
 	## get vocabulary sizes to build model
-	with open(CONST.ENCODINGS+"fr_word.json", "r") as f:
+	with open(CONST.ENCODINGS+startLang+"_word.json", "r") as f:
 		INPUT_VOCABULARY_COUNT = len(json.load(f))
-	with open(CONST.ENCODINGS+"en_word.json", "r") as f:
+	with open(CONST.ENCODINGS+endLang+"_word.json", "r") as f:
 		OUTPUT_VOCABULARY_COUNT = len(json.load(f))
 	if CONST.INCLUDE_CHAR_EMBEDDING:
-		with open(CONST.ENCODINGS+"fr_char.json", "r") as f:
+		with open(CONST.ENCODINGS+startLang+"_char.json", "r") as f:
 			INPUT_CHAR_VOCABULARY_COUNT = len(json.load(f))
-		with open(CONST.ENCODINGS+"en_char.json", "r") as f:
+		with open(CONST.ENCODINGS+endLang+"_char.json", "r") as f:
 			OUTPUT_CHAR_VOCABULARY_COUNT = len(json.load(f))
 
 
@@ -222,7 +222,7 @@ def translationTransformerModel():
 		outputStage_SHARED = simpleOutputStage(outputVocabularySize=OUTPUT_VOCABULARY_COUNT)
 	wordOut = outputStage_SHARED(decoderContext)
 
-	trainingModel = Model(inputs=encoderInput + decoderInput, outputs=wordOut, name="Transformer")
+	trainingModel = Model(inputs=encoderInput + decoderInput, outputs=wordOut, name="Transformer-"+startLang+"-to-"+endLang)
 	
 
 

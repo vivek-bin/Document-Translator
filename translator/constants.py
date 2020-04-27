@@ -3,10 +3,13 @@ from os.path import abspath
 from os.path import dirname
 from os.path import isdir
 from time import time, ctime
-import numpy as np
 import os
 import sys
 from tensorflow.keras import backend as K
+
+import tensorflow as tf
+physical_devices = tf.config.list_physical_devices('GPU')
+tf.config.experimental.set_memory_growth(physical_devices[0], enable=True)
 
 print(ctime().rjust(60,"-"))
 START_TIME = time()
@@ -137,11 +140,6 @@ RECURRENT_LAYER_RESIDUALS = True
 #transformer model specific params
 ENCODER_ATTENTION_STAGES = 6
 DECODER_ATTENTION_STAGES = 6
-
-#transformer preprocessed data
-MAX_POSITIONAL_EMBEDDING = np.array([[pos/np.power(10, 8. * i / MODEL_BASE_UNITS) for i in range(MODEL_BASE_UNITS)] for pos in range(MAX_WORDS * 2)])
-MAX_POSITIONAL_EMBEDDING[:, 0::2] = np.sin(MAX_POSITIONAL_EMBEDDING[:, 0::2])
-MAX_POSITIONAL_EMBEDDING[:, 1::2] = np.cos(MAX_POSITIONAL_EMBEDDING[:, 1::2])
 
 ###training parameters
 DATA_PARTITIONS = 50

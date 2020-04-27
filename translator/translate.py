@@ -27,7 +27,7 @@ class Translator:
 			with open(CONST.ENCODINGS+self.endLang+"_char.json", "r") as f:
 				self.endLangCharDecoding = {i:w for i,w in enumerate(json.load(f))}
 
-		_, (self.samplingModelInit, self.samplingModelNext) = loadModel(self.modelNum, loadForTraining=False)
+		_, (self.samplingModelInit, self.samplingModelNext) = loadModel(self.modelNum, startLang, endLang, loadForTraining=False)
 
 		self.wordGlossary = FA.readDictionaryGlossary()[self.startLang]
 		self.wordDictionary = FA.readDictionaryPDF()[self.startLang]

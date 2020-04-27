@@ -1,15 +1,16 @@
 import numpy as np
-from tensorflow.keras.models import load_model, Model
-from tensorflow.keras import layers
-from tensorflow.keras.optimizers import Adam
-import json
-import tensorflow.keras.backend as K
-from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, LearningRateScheduler, ReduceLROnPlateau
 import os
-from tensorflow.keras.utils import Sequence
+import json
 import time
 import h5py
 from random import shuffle
+
+from tensorflow.keras.models import load_model, Model
+from tensorflow.keras import layers
+from tensorflow.keras.optimizers import Adam
+import tensorflow.keras.backend as K
+from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, LearningRateScheduler, ReduceLROnPlateau
+from tensorflow.keras.utils import Sequence
 
 from . import constants as CONST
 from . import preparedata as PD
@@ -132,8 +133,8 @@ def sparseCrossEntropyLoss(targets=None, outputs=None):
 	batchSize = K.shape(outputs)[0]
 	sequenceSize = K.shape(outputs)[1]
 	vocabularySize = K.shape(outputs)[2]
-	firstPositionShifter = K.repeat(K.expand_dims(K.arange(sequenceSize) * vocabularySize, 0), batchSize)
-	secondPositionShifter = K.repeat(K.expand_dims(K.arange(batchSize) * sequenceSize * vocabularySize, 1), sequenceSize)
+	firstPositionShifter = K.repeat(K.expand_dims(K.arange(0, sequenceSize) * vocabularySize, 0), batchSize)
+	secondPositionShifter = K.repeat(K.expand_dims(K.arange(0, batchSize) * sequenceSize * vocabularySize, 1), sequenceSize)
 
 	shiftedtargets = K.cast(K.flatten(targets), "int32") + K.flatten(firstPositionShifter) + K.flatten(secondPositionShifter)
 	if CONST.LABEL_SMOOTHENING:
@@ -195,12 +196,12 @@ def getLastEpoch(modelName):
 	
 	return 0
 
-def loadModel(modelNum, loadForTraining=True):
+def loadModel(modelNum, startLang, endLang, loadForTraining=True):
 	#get model
 	if modelNum == 1:
-		trainingModel, samplingModels = translationLSTMAttModel()
+		trainingModel, samplingModels = translationLSTMAttModel(startLang, endLang)
 	else:
-		trainingModel, samplingModels = translationTransformerModel()
+		trainingModel, samplingModels = translationTransformerModel(startLang, endLang)
 	if loadForTraining:
 		trainingModel.compile(optimizer=Adam(lr=CONST.LEARNING_RATE, decay=CONST.LEARNING_RATE_DECAY/CONST.DATA_PARTITIONS), loss=sparseCrossEntropyLoss, metrics=[CONST.EVALUATION_METRIC])
 		trainingModel.summary()
@@ -267,8 +268,7 @@ def getTrainingData(startLang, endLang):
 
 def trainModel(modelNum, startLang="fr", endLang="en"):
 	# get model
-	trainingModel, _ = loadModel(modelNum)
-	trainingModel.name = trainingModel.name + "-{}-to-{}".format(startLang, endLang)
+	trainingModel, _ = loadModel(modelNum, startLang, endLang)
 	initialEpoch = getLastEpoch(trainingModel.name)
 
 	# prepare data generators
@@ -276,11 +276,11 @@ def trainModel(modelNum, startLang="fr", endLang="en"):
 	
 	# prepare callbacks
 	callbacks = []
-	callbacks.append(ModelCheckpoint(CONST.MODELS + trainingModel.name + CONST.MODEL_CHECKPOINT_NAME_SUFFIX, monitor=CONST.EVALUATION_METRIC, mode='max', save_best_only=True, period=CONST.CHECKPOINT_PERIOD))
+	callbacks.append(ModelCheckpoint(CONST.MODELS + trainingModel.name + CONST.MODEL_CHECKPOINT_NAME_SUFFIX, monitor="val_loss", mode='min', save_best_only=True, period=CONST.CHECKPOINT_PERIOD))
 	if CONST.LR_MODE == 2:
 		callbacks.append(LearningRateScheduler(lrScheduler))
 	elif CONST.LR_MODE == 1:
-		callbacks.append(ReduceLROnPlateau(monitor='val_loss', min_delta=0.01, factor=CONST.REDUCE_LR_DECAY, verbose=1, patience=CONST.REDUCE_LR_PATIENCE, cooldown=CONST.REDUCE_LR_PATIENCE, min_lr=CONST.LEARNING_RATE_MIN))
+		callbacks.append(ReduceLROnPlateau(monitor="val_loss", min_delta=0.01, factor=CONST.REDUCE_LR_DECAY, verbose=1, patience=CONST.REDUCE_LR_PATIENCE, cooldown=CONST.REDUCE_LR_PATIENCE, min_lr=CONST.LEARNING_RATE_MIN))
 
 	if CONST.USE_TENSORBOARD:
 		callbacks.append(TensorBoard(log_dir=CONST.LOGS + "tensorboard-log", histogram_freq=1, batch_size=CONST.BATCH_SIZE, write_graph=False, write_grads=True, write_images=False))
@@ -293,14 +293,14 @@ def trainModel(modelNum, startLang="fr", endLang="en"):
 		validationData = DataPartitionLoadingSequence(validation=True, startLang=startLang, endLang=endLang, batchSize=CONST.BATCH_SIZE, numPartitions=CONST.DATA_PARTITIONS, initialEpoch=initialEpoch)
 
 	# start training
-	_ = trainingModel.fit_generator(trainingDataGenerator, validation_data=validationData, epochs=CONST.NUM_EPOCHS*CONST.DATA_PARTITIONS, callbacks=callbacks, initial_epoch=initialEpoch)
+	_ = trainingModel.fit(trainingDataGenerator, validation_data=validationData, epochs=CONST.NUM_EPOCHS*CONST.DATA_PARTITIONS, callbacks=callbacks, initial_epoch=initialEpoch)
 
 	# save model after training
 	trainingModel.save(CONST.MODELS + trainingModel.name + CONST.MODEL_TRAINED_NAME_SUFFIX)
 
 def visualizeModel(modelNum):
 	with CONST.HiddenPrints():
-		trainingModel, samplingModels = loadModel(modelNum)
+		trainingModel, samplingModels = loadModel(modelNum, "fr", "en")
 
 	def loadLayerDict(model, l):
 		for layer in model.layers:

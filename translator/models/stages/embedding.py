@@ -9,7 +9,11 @@ from .normalize import LayerNormalization
 
 class PositionalEncoding(layers.Layer):
 	def __init__(self, **kwargs):
-		self.positional = K.variable(CONST.MAX_POSITIONAL_EMBEDDING)
+		maxPositionalEmbedding = np.array([[pos/np.power(10, 8. * i / CONST.MODEL_BASE_UNITS) for i in range(CONST.MODEL_BASE_UNITS)] for pos in range(CONST.MAX_WORDS * 2)])
+		maxPositionalEmbedding[:, 0::2] = np.sin(maxPositionalEmbedding[:, 0::2])
+		maxPositionalEmbedding[:, 1::2] = np.cos(maxPositionalEmbedding[:, 1::2])
+
+		self.positional = K.variable(maxPositionalEmbedding)
 		super(PositionalEncoding, self).__init__(**kwargs)
 
 	def call(self, inputs):
