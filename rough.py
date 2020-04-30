@@ -362,7 +362,51 @@ def trainingDataInfo():
 			print(str(k).zfill(3),":",nd[k])
 		print("max={}, min={}, average={}".format(mx, mn, t/i))
 
+def testAttentionOps():
+	import tensorflow as tf
+	import tensorflow.keras.backend as K
+	import numpy as np
 
 
-lossFuncShiftPos()
+	def _attention(key, query, value):
+		#key->enc				query->dec			val->[key(enc)]
+		#key query pair
+		key = K.variable(key)
+		query = K.variable(query)
+		#print("key:", key, K.ndim(key))
+		#print("query:", query, K.ndim(query))
+
+
+		query = K.expand_dims(query, axis=1)
+		alphaScale = K.sqrt(K.cast(2, K.dtype(query)))*10
+		alphas = K.batch_dot(query, key, axes=-1)
+		alphas = alphas / alphaScale
+		alphas = K.softmax(alphas)
+		#create weighted encoder context
+		context = K.batch_dot(alphas, value, axes=[-1, 1])
+
+		return context, alphas
+	
+	batchSize = 2
+	encSize = 3
+	unitSize = 2
+
+	ke = np.reshape(np.arange(batchSize*encSize*unitSize, dtype="float32"), (batchSize,encSize,unitSize))
+	count = batchSize*encSize*unitSize
+	d = np.reshape(np.arange(count, count+batchSize*unitSize, dtype="float32"), (batchSize, unitSize))
+	count += batchSize*unitSize
+	e = np.reshape(np.arange(count, count+batchSize*encSize*unitSize, dtype="float32"), (batchSize,encSize,unitSize))
+	count = batchSize*encSize*unitSize
+	
+	con, alph = _attention(ke, d, e)
+	print(K.ndim(con), K.shape(con), K.ndim(alph), K.shape(alph))
+	print(ke)
+	print(d)
+	print(e)
+	print("con", K.eval(con))
+	print("al",K.eval(alph))
+
+
+
+testAttentionOps()
 

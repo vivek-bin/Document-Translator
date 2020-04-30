@@ -24,14 +24,12 @@ class SharedOutput(layers.Dense):
 def recurrentOutputStage(outputVocabularySize=None, sharedEmbedding=None, name=""):
 	decoderEmbedding = layers.Input(batch_shape=(None,None,CONST.MODEL_BASE_UNITS))
 	decoderOut = layers.Input(batch_shape=(None,None,CONST.MODEL_BASE_UNITS))
-	contextOut = layers.Input(batch_shape=(None,None,CONST.MODEL_BASE_UNITS))
 	
 	decoderOutFinal = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION)))(decoderOut)
-	contextFinal = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION)))(contextOut)
 	prevWordFinal = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION)))(decoderEmbedding)
 
 	#combine
-	wordOut = layers.Add()([contextFinal, decoderOutFinal, prevWordFinal])
+	wordOut = layers.Add()([decoderOutFinal, prevWordFinal])
 	if CONST.LAYER_NORMALIZATION:
 		wordOut = LayerNormalization(**CONST.LAYER_NORMALIZATION_ARGUMENTS)(wordOut)
 	wordOut = layers.TimeDistributed(layers.Dense(CONST.EMBEDDING_SIZE, activation=CONST.DENSE_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION)))(wordOut)
@@ -46,7 +44,7 @@ def recurrentOutputStage(outputVocabularySize=None, sharedEmbedding=None, name="
 		assert outputVocabularySize
 		wordOut = layers.TimeDistributed(layers.Dense(outputVocabularySize, activation="softmax", bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION)))(wordOut)
 
-	outputStage = Model(inputs=[contextOut, decoderOut, decoderEmbedding], outputs=[wordOut], name="output"+name)
+	outputStage = Model(inputs=[decoderOut, decoderEmbedding], outputs=[wordOut], name="output"+name)
 	return outputStage
 
 

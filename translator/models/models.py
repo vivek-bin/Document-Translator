@@ -54,55 +54,40 @@ def translationLSTMAttModel(startLang, endLang):
 	######ENCODER PROCESSING STAGE
 	encoderStates = []
 	encoderOut = encoderEmbedding
-	for i in range(CONST.DECODER_ENCODER_DEPTH):
-		encoderLSTM = layers.Bidirectional(layers.LSTM(CONST.MODEL_BASE_UNITS//2, return_sequences=True, return_state=True, activation=CONST.LSTM_ACTIVATION, recurrent_activation=CONST.LSTM_RECURRENT_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION), recurrent_regularizer=l2(CONST.L2_REGULARISATION)))
-		encoderOutNext, forwardH, forwardC, backwardH, backwardC = encoderLSTM(encoderOut)
+	### bi-directional layer
+	if CONST.ENCODER_BIDIREC_DEPTH > 0:
+		encoderCell = EncoderLSTMCell(units=CONST.MODEL_BASE_UNITS, depth=CONST.ENCODER_BIDIREC_DEPTH, use_residual_connection=CONST.RECURRENT_LAYER_RESIDUALS, use_layer_norm=CONST.LAYER_NORMALIZATION, use_peephole=CONST.PEEPHOLE, activation=CONST.LSTM_ACTIVATION, recurrent_activation=CONST.LSTM_RECURRENT_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION), recurrent_regularizer=l2(CONST.L2_REGULARISATION))
+		encoderBiLSTM = layers.Bidirectional(layers.RNN(cell=encoderCell, return_sequences=True, return_state=True))
+		encoderAllOut = encoderBiLSTM(encoderOut)
+		encoderOut = encoderAllOut[0]
+		encoderStates.extend([layers.Add()([encoderAllOut[1+i], encoderAllOut[1+i+CONST.ENCODER_BIDIREC_DEPTH]]) for i in range(2*CONST.ENCODER_BIDIREC_DEPTH)])
+		encoderOut = layers.TimeDistributed(layers.Dense(CONST.MODEL_BASE_UNITS, activation=CONST.DENSE_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION)))(encoderOut)
+	
+	### uni-directional layer
+	if CONST.DECODER_ENCODER_DEPTH > CONST.ENCODER_BIDIREC_DEPTH:
+		encoderCell = EncoderLSTMCell(units=CONST.MODEL_BASE_UNITS, depth=CONST.DECODER_ENCODER_DEPTH-CONST.ENCODER_BIDIREC_DEPTH, use_residual_connection=CONST.RECURRENT_LAYER_RESIDUALS, use_layer_norm=CONST.LAYER_NORMALIZATION, use_peephole=CONST.PEEPHOLE, activation=CONST.LSTM_ACTIVATION, recurrent_activation=CONST.LSTM_RECURRENT_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION), recurrent_regularizer=l2(CONST.L2_REGULARISATION))
+		encoderUniLSTM = layers.RNN(cell=encoderCell, return_sequences=True, return_state=True)
+		encoderAllOut = encoderUniLSTM(encoderOut)
+		encoderOut = encoderAllOut[0]
+		encoderStates.extend(encoderAllOut[1:])
 
-		if CONST.RECURRENT_LAYER_RESIDUALS:
-			encoderOut = layers.Add()([encoderOut, encoderOutNext])
-		else:
-			encoderOut = encoderOutNext
-
-		if CONST.LAYER_NORMALIZATION:
-			encoderLayerNorm = LayerNormalization(**CONST.LAYER_NORMALIZATION_ARGUMENTS)
-			encoderOut = encoderLayerNorm(encoderOut)
-
-		encoderStates.append(layers.Concatenate()([forwardH, backwardH]))
-		encoderStates.append(layers.Concatenate()([forwardC, backwardC]))
 
 	######DECODER PROCESSING STAGE
-	decoderStates = []
-	decoderOut = decoderEmbedding
-	decoderLSTM_SHARED = []
-	decoderLayerNorm_SHARED = []
-	for i in range(CONST.DECODER_ENCODER_DEPTH):
-		initialState = encoderStates[i*2:(i+1)*2]
-		decoderLSTM_SHARED.append(layers.LSTM(CONST.MODEL_BASE_UNITS, return_sequences=True, return_state=True, activation=CONST.LSTM_ACTIVATION, recurrent_activation=CONST.LSTM_RECURRENT_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION), recurrent_regularizer=l2(CONST.L2_REGULARISATION)))
-		decoderOutNext, forwardH, forwardC = decoderLSTM_SHARED[i]([decoderOut] + initialState)
-
-		if CONST.RECURRENT_LAYER_RESIDUALS:
-			decoderOut = layers.Add()([decoderOut, decoderOutNext])
-		else:
-			decoderOut = decoderOutNext
-
-		if CONST.LAYER_NORMALIZATION:
-			decoderLayerNorm_SHARED.append(LayerNormalization(**CONST.LAYER_NORMALIZATION_ARGUMENTS))
-			decoderOut = decoderLayerNorm_SHARED[i](decoderOut)
-
-		decoderStates.append(forwardH)
-		decoderStates.append(forwardC)
-		
-
-	######ATTENTION STAGE
-	attentionLayer_SHARED = multiHeadAttentionStage()
-	[contextOut, alphas] = attentionLayer_SHARED([decoderOut, encoderOut])
+	alphaPlaceholder = layers.Reshape((1, -1))(encoderStates[0])
+	decoderInitialStates = encoderStates + [encoderOut, alphaPlaceholder]
+	decoderCell = DecoderLSTMCell(units=CONST.MODEL_BASE_UNITS, depth=CONST.DECODER_ENCODER_DEPTH, use_residual_connection=CONST.RECURRENT_LAYER_RESIDUALS, use_layer_norm=CONST.LAYER_NORMALIZATION, use_peephole=CONST.PEEPHOLE, activation=CONST.LSTM_ACTIVATION, recurrent_activation=CONST.LSTM_RECURRENT_ACTIVATION, bias_initializer=CONST.BIAS_INITIALIZER, kernel_regularizer=l2(CONST.L2_REGULARISATION), recurrent_regularizer=l2(CONST.L2_REGULARISATION))
+	decoderLSTM = layers.RNN(cell=decoderCell, return_sequences=True, return_state=True)
+	decoderAllOut = decoderLSTM(decoderEmbedding, initial_state=decoderInitialStates)
+	decoderOut = decoderAllOut[0]
+	decoderStates = decoderAllOut[1:]
+	alphas = decoderStates[-1]
 	
 	######FINAL PREDICTION STAGE
 	if CONST.SHARED_INPUT_OUTPUT_EMBEDDINGS:
 		outputStage_SHARED = recurrentOutputStage(sharedEmbedding=decoderEmbedding_SHARED)
 	else:
 		outputStage_SHARED = recurrentOutputStage(outputVocabularySize=OUTPUT_VOCABULARY_COUNT)
-	wordOut = outputStage_SHARED([contextOut, decoderOut, decoderEmbedding])
+	wordOut = outputStage_SHARED([decoderOut, decoderEmbedding])
 
 	trainingModel = Model(inputs=encoderInput + decoderInput, outputs=wordOut, name="AttLSTM-"+startLang+"-to-"+endLang)
 	
@@ -117,29 +102,18 @@ def translationLSTMAttModel(startLang, endLang):
 	###########
 	#next steps prediction model
 	preprocessedEncoder = layers.Input(batch_shape=(None, None, CONST.MODEL_BASE_UNITS))
-	previousStates = []
+	previousStates = [layers.Input(batch_shape=(None, CONST.MODEL_BASE_UNITS))]
 	for _ in range(CONST.DECODER_ENCODER_DEPTH):
 		previousStates.append(layers.Input(batch_shape=(None, CONST.MODEL_BASE_UNITS)))			#H
 		previousStates.append(layers.Input(batch_shape=(None, CONST.MODEL_BASE_UNITS)))			#C
 
-	#shared decoder
-	decoderStates = []
-	decoderOut = decoderEmbedding
-	for i in range(CONST.DECODER_ENCODER_DEPTH):
-		initialState = previousStates[i*2:(i+1)*2]
-		decoderOutNext, forwardH, forwardC = decoderLSTM_SHARED[i]([decoderOut] + initialState)
-		if CONST.RECURRENT_LAYER_RESIDUALS:
-			decoderOut = layers.Add()([decoderOut, decoderOutNext])
-		else:
-			decoderOut = decoderOutNext
-		if CONST.LAYER_NORMALIZATION:
-			decoderOut = decoderLayerNorm_SHARED[i](decoderOut)
-
-		decoderStates.append(forwardH)
-		decoderStates.append(forwardC)
-
-	[contextOut, alphas] = attentionLayer_SHARED([decoderOut, preprocessedEncoder])
-	wordOut = outputStage_SHARED([contextOut, decoderOut, decoderEmbedding])
+	alphaPlaceholder = layers.Reshape((1, -1))(previousStates[0])
+	decoderPreviousStates = previousStates + [preprocessedEncoder, alphaPlaceholder]
+	decoderAllOut = decoderLSTM(decoderEmbedding, initial_state=decoderPreviousStates)
+	decoderOut = decoderAllOut[0]
+	decoderStates = decoderAllOut[1:]
+	alphas = decoderStates[-1]
+	wordOut = outputStage_SHARED([decoderOut, decoderEmbedding])
 	
 	samplingModelNext = Model(inputs=[preprocessedEncoder] + previousStates + decoderInput, outputs=[wordOut, alphas] + decoderStates, name="AttLSTMSamplingNext")
 

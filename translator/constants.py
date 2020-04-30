@@ -136,7 +136,9 @@ LAYER_NORMALIZATION_ARGUMENTS = dict(center=True, scale=True)
 
 #recurrent model specific params
 DECODER_ENCODER_DEPTH = 4
+ENCODER_BIDIREC_DEPTH = 2
 RECURRENT_LAYER_RESIDUALS = True
+PEEPHOLE = True
 #transformer model specific params
 ENCODER_ATTENTION_STAGES = 6
 DECODER_ATTENTION_STAGES = 6

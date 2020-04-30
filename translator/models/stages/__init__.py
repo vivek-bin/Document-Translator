@@ -7,3 +7,5 @@ from .embedding import *
 from .output import *
 
 from .normalize import *
+
+from .recurrent import *
