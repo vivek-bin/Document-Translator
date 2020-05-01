@@ -102,7 +102,7 @@ class Translator:
 			latestBChars = PD.encodeCharsBackward(lastWord, self.endLang)[:,-2:-1]
 			encodedData.append(np.concatenate((prevInput[2], latestBChars), axis=1))
 
-		if self.modelNum == 1:								# recurrent network being used, only fetch latest decoded word, or SOS at start
+		if self.modelNum in [1, 2]:								# recurrent network being used, only fetch latest decoded word, or SOS at start
 			encodedData = [x[:,-1:] for x in encodedData]
 		
 		return encodedData

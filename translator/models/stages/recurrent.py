@@ -469,6 +469,19 @@ class DecoderLSTMCell(DropoutRNNCellMixin, Layer):
 		h = o * self.activation(c)
 		return c, h
 
+	def _dotAttention(self, key, query, value):
+		#generate alphas
+		query = K.expand_dims(query, axis=1)
+		alphaScale = K.sqrt(K.cast(self.units, K.dtype(self.key_kernel)))
+		alphas = K.batch_dot(query, key, axes=-1)
+		alphas = alphas / alphaScale
+		alphas = K.softmax(alphas)
+		#create weighted encoder context
+		context = K.batch_dot(alphas, value, axes=[-1, 1])
+		context = K.squeeze(context, axis=1)
+
+		return context, alphas
+
 	def _attention(self, key, query):
 		#key->enc				query->dec			val->[->enc]
 		#key query pair
@@ -481,16 +494,7 @@ class DecoderLSTMCell(DropoutRNNCellMixin, Layer):
 		keyAttIn = K.reshape(keyAttIn, originalShape)
 
 		#### attention!
-		#generate alphas
-		query = K.expand_dims(query, axis=1)
-		alphaScale = K.sqrt(K.cast(self.units, K.dtype(self.key_kernel)))
-		alphas = K.batch_dot(query, keyAttIn, axes=-1)
-		alphas = alphas / alphaScale
-		alphas = K.softmax(alphas)
-		#create weighted encoder context
-		value = key
-		context = K.batch_dot(alphas, value, axes=[-1, 1])
-		context = K.squeeze(context, axis=1)
+		context, alphas = self._dotAttention(keyAttIn, query, key)
 
 		return context, alphas
 

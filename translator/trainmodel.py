@@ -200,8 +200,12 @@ def loadModel(modelNum, startLang, endLang, loadForTraining=True):
 	#get model
 	if modelNum == 1:
 		trainingModel, samplingModels = translationLSTMAttModel(startLang, endLang)
-	else:
+	elif modelNum == 2:
+		trainingModel, samplingModels = translationEncoderDecoderLSTMAttModel(startLang, endLang)
+	elif modelNum == 3:
 		trainingModel, samplingModels = translationTransformerModel(startLang, endLang)
+	else:
+		raise IndexError
 	if loadForTraining:
 		trainingModel.compile(optimizer=Adam(lr=CONST.LEARNING_RATE, decay=CONST.LEARNING_RATE_DECAY/CONST.DATA_PARTITIONS), loss=sparseCrossEntropyLoss, metrics=[CONST.EVALUATION_METRIC])
 		trainingModel.summary()

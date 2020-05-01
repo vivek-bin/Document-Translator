@@ -55,14 +55,11 @@ def main():
 		writeEncodingFromProcessed("en")
 
 	if trainModelFlag:
-		assert modelNum in [1, 2]
-
 		from translator.trainmodel import trainModel
 		trainModel(startLang="fr", endLang="en", modelNum=modelNum)
 
 	if translateFlag:
 		text = ["Ma question porte sur un sujet qui est à l'ordre du jour du jeudi.", "valorisation versement libre valorisation.", "ljh kblhblb gbk."] + text		#testing
-		assert modelNum in [1, 2]
 		assert bool(text) ^ bool(documents)
 
 		from translator.translate import Translator
